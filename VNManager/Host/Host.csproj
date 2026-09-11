@@ -11,6 +11,7 @@
     <ItemGroup>
         <ProjectReference Include="..\Abstractions\Abstractions.csproj" />
         <ProjectReference Include="..\LocaleEmulator\LocaleEmulator.csproj" />
+        <ProjectReference Include="..\NoRegionLoader\NoRegionLoader.csproj" />
         <ProjectReference Include="..\Logging\Logging.csproj" />
         <ProjectReference Include="..\ProcessManagement\ProcessManagement.csproj" />
     </ItemGroup>
@@ -20,6 +21,9 @@
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
         <None Update="Configuration\locale-emulator.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="Configuration\no-region-loader.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
         <None Include="..\ProcessManagement\process-management.json"

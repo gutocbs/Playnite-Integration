@@ -43,6 +43,13 @@ public sealed class AdapterIntegrationTests
                 pollingInterval = "00:00:00.025"
             }));
         File.WriteAllText(
+            Path.Combine(configurationDirectory, "no-region-loader.json"),
+            JsonSerializer.Serialize(new
+            {
+                noRegionLoaderExecutable = localeEmulatorStub,
+                pollingInterval = "00:00:00.025"
+            }));
+        File.WriteAllText(
             Path.Combine(configurationDirectory, "process-management.json"),
             JsonSerializer.Serialize(new
             {

@@ -17,6 +17,7 @@
     <ProjectReference Include="..\Abstractions\Abstractions.csproj" />
     <ProjectReference Include="..\Host\Host.csproj" />
     <ProjectReference Include="..\LocaleEmulator\LocaleEmulator.csproj" />
+    <ProjectReference Include="..\NoRegionLoader\NoRegionLoader.csproj" />
     <ProjectReference Include="..\Logging\Logging.csproj" />
     <ProjectReference Include="..\ProcessManagement\ProcessManagement.csproj" />
     <ProjectReference Include="..\TestAssets\LocaleEmulatorStub\LocaleEmulatorStub.csproj" ReferenceOutputAssembly="false" />
