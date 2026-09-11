@@ -126,9 +126,8 @@ its own.
 
 The Adapter uses the returned result to terminate its own execution.
 
-The exact exit-code values and their meanings are defined separately from this
-document. The transport used to return the complete structured result to the
-Adapter is not defined yet and must keep protocol data separate from logs and
+Exit-code values, request/result framing and transport ownership are defined in
+`docs/ADAPTER_HOST_PROTOCOL.md`. Protocol data remains separate from logs and
 diagnostic output.
 
 ---
@@ -140,12 +139,19 @@ propagated through the Host to the active Launcher. If the Adapter terminates
 before it can signal, the Host must detect the lost Adapter connection or
 process lifetime and trigger the same cancellation behavior.
 
+The process-management component may impose a configured timeout while waiting
+for the game or a monitor candidate to start. This timeout ends immediately
+when a process is detected and must not limit how long the running game may
+remain open. Startup timeout failures use a specific structured error rather
+than a generic Launcher failure.
+
 When cancellation is requested, the Launcher stops monitoring or validating the
 game process lifecycle and returns control. The game itself remains running and
 must not be terminated merely because supervision was cancelled.
 
-The mechanism used to signal cancellation and detect unexpected Adapter
-termination is still to be defined.
+Graceful cancellation uses a named Windows event. Unexpected Adapter
+termination is detected through the Adapter process identifier and triggers the
+same Host cancellation token.
 
 ---
 
@@ -172,3 +178,9 @@ Configuration, validation and lifecycle management of those tools are defined by
 No shared configuration mechanism is defined at the architectural level at this stage.
 
 A common model should only be introduced if concrete Launcher implementations demonstrate a shared requirement.
+
+Process monitoring and cleanup are demonstrated shared requirements and belong
+to the .NET process-management component. Its JSON configuration keeps monitor
+processes, global cleanup processes and executable-specific cleanup processes
+as separate lists. A Launcher initiates supervision, but it does not own or
+duplicate those lists in its own options.

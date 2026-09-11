@@ -1,1 +1,3 @@
-﻿Console.WriteLine("Hello, World!");
+using Launcher.Host;
+
+return await HostApplication.RunAsync(args);

@@ -8,4 +8,24 @@
         <RootNamespace>Launcher.Host</RootNamespace>
     </PropertyGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\Abstractions\Abstractions.csproj" />
+        <ProjectReference Include="..\LocaleEmulator\LocaleEmulator.csproj" />
+        <ProjectReference Include="..\Logging\Logging.csproj" />
+        <ProjectReference Include="..\ProcessManagement\ProcessManagement.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="Configuration\host.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="Configuration\locale-emulator.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Include="..\ProcessManagement\process-management.json"
+              Link="Configuration\process-management.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
 </Project>

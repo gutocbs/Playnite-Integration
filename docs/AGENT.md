@@ -35,6 +35,7 @@ Read before making architectural changes:
 - `docs/LAUNCHER_SCOPE.md`
 - `docs/logging.md`
 - `docs/Principios de Design.md`
+- `docs/ADAPTER_HOST_PROTOCOL.md`
 
 `docs/FEATURES.md` and `docs/LAUNCHERS.md` are planned but do not exist yet.
 
@@ -47,13 +48,24 @@ Read before making architectural changes:
   separate future concern.
 - Preserve backwards compatibility unless explicitly told otherwise.
 - Treat PowerShell launcher scripts and filesystem script discovery as legacy.
+- Keep environment-specific and operational values in external configuration by
+  default. Hard-coded values require a concrete reason and should be the
+  exception rather than the standard configuration mechanism.
 - Explain architectural changes before implementing large refactors.
 - If implementation contradicts current documentation, stop and explain the
   conflict instead of guessing.
 
 ## Testing
 
-The canonical test command has not been defined yet.
+The current canonical test command is:
+
+```text
+dotnet run --project VNManager/Tests/Tests.csproj
+```
+
+The test suite contains unit tests and Windows process integration tests. The
+integration fixtures use only the dedicated `VnTest*` console executables under
+`VNManager/TestAssets` and must clean up every persistent process they start.
 
 ## Current focus
 

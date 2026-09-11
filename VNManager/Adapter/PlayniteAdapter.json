@@ -1,0 +1,5 @@
+{
+  "hostExecutable": "..\\Host\\bin\\Debug\\net10.0\\Host.exe",
+  "hostConfigurationDirectory": "..\\Host\\bin\\Debug\\net10.0\\Configuration",
+  "logPath": "..\\logs\\launcher.log"
+}

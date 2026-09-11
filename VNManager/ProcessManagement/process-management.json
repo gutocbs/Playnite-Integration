@@ -1,0 +1,20 @@
+{
+  "monitorProcesses": [
+    "rugp.exe",
+    "SiglusEngine.exe",
+    "malie.exe"
+  ],
+  "globalTimeout": 120,
+  "globalCleanupProcesses": [
+    "UCManSvc.exe"
+  ],
+  "executables": [
+    {
+      "name": "rugp.exe",
+      "timeout": 120,
+      "cleanupProcesses": [
+        "SdProxy.exe"
+      ]
+    }
+  ]
+}

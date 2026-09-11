@@ -32,6 +32,10 @@ the Host to the selected Launcher.
 The PowerShell Adapter creates the `DispatcherRequest` after reading and
 interpreting Playnite metadata and Features.
 
+When Playnite is the frontend, executable and argument values come from the
+action returned by `PlayniteApi.ExpandGameVariables(game, playAction)`. The
+Adapter does not expand individual Playnite variables itself.
+
 Initial fields:
 
 | Field | Type | Required | Description |
@@ -43,8 +47,8 @@ Initial fields:
 
 The Host does not receive Playnite objects and does not interpret Features.
 
-The exact serialization and transport framing are still to be defined. JSON is
-the preferred initial representation.
+The request uses the JSON file framing defined in
+`docs/ADAPTER_HOST_PROTOCOL.md`.
 
 ## LaunchRequest
 
@@ -97,12 +101,9 @@ Internally, Launchers and the Host use the structured `LaunchResult`. The Host
 also terminates with an exit code so that the Adapter can report the overall
 process outcome to Playnite.
 
-The transport used to return complete structured result details to the Adapter
-is not defined yet. It must be planned before implementation. The design must
-keep protocol output separate from logs and diagnostic console output.
-
-Until that transport is defined, implementations must not assume that stdout is
-available simultaneously for logs and result serialization.
+The Host writes the complete structured result to the result JSON file defined
+by `docs/ADAPTER_HOST_PROTOCOL.md`. Protocol data is not written to stdout and
+remains separate from logs and diagnostic output.
 
 ## Cancellation
 
@@ -126,8 +127,9 @@ If Playnite independently terminates or cancels the Adapter:
 Cancellation is therefore a request to stop supervision, not a request to
 terminate the game.
 
-The transport used to send cancellation and detect unexpected Adapter
-termination across the process boundary is still to be defined.
+The Adapter signals graceful cancellation through a named Windows event. The
+Host also monitors the Adapter process identifier and maps unexpected Adapter
+termination to the same cancellation token.
 
 ## Responsibilities
 
@@ -138,7 +140,7 @@ termination across the process boundary is still to be defined.
 - Build and serialize `DispatcherRequest`.
 - Start the Host and propagate cancellation.
 - Remain active while the Host is active.
-- Receive the final process exit code and, once defined, the structured result.
+- Receive the final process exit code and structured JSON result.
 
 ### Host and Dispatcher
 

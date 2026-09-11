@@ -105,12 +105,16 @@ The Adapter is responsible for:
 - invoking `Launcher-Host`;
 - remaining active while the Host is active;
 - initiating cancellation when requested by Playnite;
-- receiving the Host exit code and, once the transport is defined, its
-  structured result;
+- receiving the Host exit code and structured JSON result;
 - presenting relevant failures through the frontend boundary.
 
 The Adapter does not own launcher validation, resolution, dispatching, process
 management or service orchestration.
+
+For Playnite, the Adapter obtains the selected play action and calls
+`PlayniteApi.ExpandGameVariables(game, action)`. The expanded action is the
+source of the executable and arguments sent to the Host. The Adapter does not
+implement or duplicate Playnite variable expansion rules.
 
 ### Launcher-Host — .NET executable
 
@@ -128,7 +132,7 @@ It is responsible for:
 - receiving and preserving `LaunchResult`;
 - coordinating application-level logging and error handling;
 - mapping the final outcome to a process exit code;
-- returning the structured result once its transport is defined.
+- returning the structured result through the file protocol.
 
 The Host does not:
 
@@ -340,8 +344,10 @@ Game continues running unmonitored
 
 Cancellation does not authorize the Host or Launcher to terminate the game.
 
-The cross-process cancellation and Adapter-liveness mechanism is not yet defined
-and must be planned before implementation.
+The Adapter creates a named Windows event for graceful cancellation and passes
+its process identifier to the Host. The Host maps either the event signal or
+unexpected Adapter termination to the same `CancellationToken`. Details are in
+`docs/ADAPTER_HOST_PROTOCOL.md`.
 
 ## Results and exit codes
 
@@ -351,12 +357,10 @@ The system uses both a structured result and a process exit code:
 - The Host exit code communicates the overall process outcome to the Adapter and
   Playnite.
 
-The mechanism used to return the complete structured result across the process
-boundary is not yet defined. Protocol output must remain separate from logging
-and diagnostic console output.
-
-The exact exit-code values and their mapping from `LaunchResult` will be
-documented separately before implementation.
+The Adapter and Host exchange request and result JSON through unique temporary
+files written with `.part` plus atomic replacement. Protocol output remains
+separate from logging and console output. Exit-code categories and the complete
+framing are defined in `docs/ADAPTER_HOST_PROTOCOL.md`.
 
 ## Logging
 
@@ -447,6 +451,34 @@ through a reusable Launcher or future Feature component.
 External tool configuration belongs initially to the Launcher that requires it.
 A shared configuration model should be introduced only after multiple concrete
 Launchers demonstrate the same need.
+
+Configuration values such as executable locations, profile identifiers,
+timeouts, polling intervals and process names must normally be stored outside
+the application code and loaded into typed options. String literals remain
+appropriate for stable protocol values, contract identifiers, error codes and
+human-readable messages. Embedding operational configuration in code is an
+exception that requires a concrete justification.
+
+Process monitoring and cleanup configuration belongs to the shared process
+management component, not to individual Launchers. Its external configuration
+defines:
+
+- the process names eligible for monitoring;
+- cleanup processes applied to every monitored execution; and
+- cleanup processes associated with a specific monitored executable.
+
+The monitor selects the first configured process that appears and returns its
+normalized name. Cleanup combines the global list with every specific entry
+whose executable name matches that monitored name case-insensitively. Launcher
+configuration must not duplicate these process lists.
+
+Process-management configuration also defines a startup timeout in seconds.
+`globalTimeout` applies to the game executable and monitor candidates unless an
+entry in `executables` supplies its own `timeout`. Each candidate is eligible
+only during its configured startup window. Once a process is detected, no
+runtime timeout is applied; supervision continues until that process exits or
+cancellation is requested. Exhausting every candidate window produces the
+stable `PROCESS_START_TIMEOUT` Launcher error.
 
 ## Initial scope
 
