@@ -4,6 +4,7 @@
     "SiglusEngine.exe",
     "malie.exe"
   ],
+  "preferredProcessDetectionWindowSeconds": 5,
   "globalTimeout": 120,
   "globalCleanupProcesses": [
     "UCManSvc.exe"

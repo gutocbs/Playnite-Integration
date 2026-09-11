@@ -26,6 +26,12 @@ public static class ProcessManagementOptionsLoader
                 "Process management globalTimeout must be greater than zero seconds.");
         }
 
+        if (options.PreferredProcessDetectionWindowSeconds < 0)
+        {
+            throw new InvalidDataException(
+                "Process management preferredProcessDetectionWindowSeconds cannot be negative.");
+        }
+
         var invalidExecutable = options.Executables.FirstOrDefault(executable =>
             string.IsNullOrWhiteSpace(executable.Name) || executable.Timeout is <= 0);
         if (invalidExecutable is not null)

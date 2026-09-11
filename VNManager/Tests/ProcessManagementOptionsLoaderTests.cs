@@ -13,6 +13,7 @@ public sealed class ProcessManagementOptionsLoaderTests
             """
             {
               "monitorProcesses": ["rugp.exe", "SiglusEngine.exe", "malie.exe"],
+              "preferredProcessDetectionWindowSeconds": 7,
               "globalTimeout": 120,
               "globalCleanupProcesses": ["UCManSvc.exe"],
               "executables": [
@@ -28,6 +29,7 @@ public sealed class ProcessManagementOptionsLoaderTests
         var options = ProcessManagementOptionsLoader.Load(configurationPath);
 
         Assert.Equal(["rugp.exe", "SiglusEngine.exe", "malie.exe"], options.MonitorProcesses);
+        Assert.Equal(7, options.PreferredProcessDetectionWindowSeconds);
         Assert.Equal(120, options.GlobalTimeout);
         Assert.Equal(["UCManSvc.exe"], options.GlobalCleanupProcesses);
         var executable = Assert.Single(options.Executables);

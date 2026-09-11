@@ -35,6 +35,47 @@ public sealed class ProcessIntegrationTests
     }
 
     [Fact]
+    public async Task ProcessMonitor_PrefersConfiguredEngineStartedByShortLivedBootstrapper()
+    {
+        var bootstrapper = TestExecutable("ShortLived", "VnTestShort.exe");
+        var engine = TestExecutable("PersistentB", "VnTestStayB.exe");
+        var monitor = new ProcessMonitor(
+            new ProcessManagementOptions
+            {
+                MonitorProcesses = ["VnTestStayB.exe"],
+                PreferredProcessDetectionWindowSeconds = 2,
+                GlobalTimeout = 10
+            },
+            new NullLogger());
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var monitoring = monitor.WaitForStartAndExitAsync(
+            bootstrapper,
+            TimeSpan.FromMilliseconds(25),
+            timeout.Token);
+
+        using var bootstrapperProcess = Start(bootstrapper, "500");
+        await Task.Delay(100, timeout.Token);
+        using var engineProcess = Start(engine);
+
+        try
+        {
+            await Task.Delay(600, timeout.Token);
+            Assert.False(monitoring.IsCompleted);
+
+            engineProcess.Kill();
+            await engineProcess.WaitForExitAsync(timeout.Token);
+
+            var monitoredProcessName = await monitoring;
+            Assert.Equal("VnTestStayB", monitoredProcessName);
+        }
+        finally
+        {
+            KillIfRunning(bootstrapperProcess);
+            KillIfRunning(engineProcess);
+        }
+    }
+
+    [Fact]
     public async Task ProcessCleanup_TerminatesMultipleConfiguredExecutables()
     {
         var executableA = TestExecutable("PersistentA", "VnTestStayA.exe");

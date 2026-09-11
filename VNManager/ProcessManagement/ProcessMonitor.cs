@@ -29,9 +29,20 @@ public sealed class ProcessMonitor(
                 "Process management globalTimeout must be greater than zero seconds.");
         }
 
-        var configuredProcesses = new[] { gameExecutable }
-            .Concat(options.MonitorProcesses)
+        var gameProcess = ProcessName.Normalize(gameExecutable);
+        var preferredProcesses = options.MonitorProcesses
             .Select(ProcessName.Normalize)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(processName => !string.Equals(
+                processName,
+                gameProcess,
+                StringComparison.OrdinalIgnoreCase))
+            .Select(processName => new MonitoredProcess(
+                processName,
+                ResolveTimeout(processName)))
+            .ToArray();
+        var configuredProcesses = new[] { gameProcess }
+            .Concat(preferredProcesses.Select(process => process.Name))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(processName => new MonitoredProcess(
                 processName,
@@ -54,7 +65,10 @@ public sealed class ProcessMonitor(
             });
 
         string? processName = null;
+        var gameProcessWasStarted = false;
         var startedAt = Stopwatch.GetTimestamp();
+        var preferredProcessDetectionWindow = TimeSpan.FromSeconds(
+            options.PreferredProcessDetectionWindowSeconds);
         while (processName is null)
         {
             var elapsed = Stopwatch.GetElapsedTime(startedAt);
@@ -62,11 +76,35 @@ public sealed class ProcessMonitor(
                 .Where(process => elapsed < process.Timeout)
                 .ToArray();
 
+            // Engine processes are preferred over a short-lived executable
+            // used only to bootstrap the actual game.
             processName = activeCandidates
+                .Where(process => preferredProcesses.Any(preferred => string.Equals(
+                    preferred.Name,
+                    process.Name,
+                    StringComparison.OrdinalIgnoreCase)))
                 .Select(process => process.Name)
                 .FirstOrDefault(IsRunning);
             if (processName is not null)
             {
+                break;
+            }
+
+            if (IsRunning(gameProcess))
+            {
+                gameProcessWasStarted = true;
+
+                if (elapsed >= preferredProcessDetectionWindow)
+                {
+                    processName = gameProcess;
+                    break;
+                }
+            }
+            else if (gameProcessWasStarted && elapsed >= preferredProcessDetectionWindow)
+            {
+                // The bootstrapper already exited and no configured engine
+                // appeared during its detection window.
+                processName = gameProcess;
                 break;
             }
 
