@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Abstractions\Abstractions.csproj" />
+    <ProjectReference Include="..\Host\Host.csproj" />
+    <ProjectReference Include="..\LocaleEmulator\LocaleEmulator.csproj" />
+    <ProjectReference Include="..\Logging\Logging.csproj" />
+    <ProjectReference Include="..\ProcessManagement\ProcessManagement.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\Host\Configuration\*.json" CopyToOutputDirectory="PreserveNewest" Link="Configuration\%(Filename)%(Extension)" />
+    <None Include="..\ProcessManagement\process-management.json" CopyToOutputDirectory="PreserveNewest" Link="Configuration\process-management.json" />
+  </ItemGroup>
+
+</Project>

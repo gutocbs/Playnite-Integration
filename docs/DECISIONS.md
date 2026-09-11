@@ -41,3 +41,13 @@ resolution, dispatching, process coordination and launcher implementations live
 in the .NET solution.
 
 Existing PowerShell launchers are transitional and may be migrated incrementally.
+
+## ADR-004 - Playnite integration plugin is an optional frontend adapter
+
+Status: Accepted
+
+The solution may contain a `PlaynitePlugin` project that references the Playnite
+SDK and implements dynamic Play Actions based on the `[Launcher]` Feature.
+Playnite-specific code must remain isolated in that project. The Host,
+LauncherSupervisor, Abstractions and launcher projects remain Playnite-free and
+continue to be reusable by other frontends.

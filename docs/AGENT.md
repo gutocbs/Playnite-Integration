@@ -10,7 +10,8 @@ standalone .NET launcher system for application logic.
 
 ## Architectural principles
 
-- Playnite-specific code must remain inside the PowerShell Adapter.
+- Playnite-specific code must remain inside the PowerShell Adapter or the
+  isolated PlaynitePlugin project.
 - PowerShell integrates with Playnite and the Windows environment; it does not
   own launcher orchestration or service logic.
 - The .NET Host owns request parsing, validation, launcher resolution,
@@ -43,7 +44,8 @@ Read before making architectural changes:
 
 - Keep the PowerShell Adapter thin.
 - Prefer small .NET components over a large Host or Dispatcher.
-- Do not introduce Playnite dependencies into the Host or Launcher projects.
+- Do not introduce Playnite dependencies into the Host, Supervisor or Launcher
+  projects; only PlaynitePlugin may reference the Playnite SDK.
 - Do not add Feature interpretation to the Host; Feature processing is a
   separate future concern.
 - Preserve backwards compatibility unless explicitly told otherwise.
