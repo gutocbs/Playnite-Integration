@@ -117,7 +117,15 @@ public sealed class NoRegionLoaderLauncher(
         catch (Exception exception)
         {
             logger.Write(LogLevel.Warning, "NoRegionLoader", "Process cleanup did not complete",
-                new Dictionary<string, object?> { ["Error"] = exception.Message });
+                CleanupErrorData(exception));
         }
     }
+
+    private static IReadOnlyDictionary<string, object?> CleanupErrorData(Exception exception) =>
+        new Dictionary<string, object?>
+        {
+            ["ExceptionType"] = exception.GetType().FullName,
+            ["Error"] = exception.Message,
+            ["StackTrace"] = exception.ToString()
+        };
 }

@@ -77,6 +77,21 @@ internal sealed class FakeProcessCleanup : IProcessCleanup
     }
 }
 
+internal sealed class FakeServiceStopper : IServiceStopper
+{
+    public List<string> ServiceNames { get; } = [];
+
+    public ServiceStopResult Result { get; init; } = new(true);
+
+    public Task<ServiceStopResult> StopAsync(
+        string serviceName,
+        CancellationToken cancellationToken = default)
+    {
+        ServiceNames.Add(serviceName);
+        return Task.FromResult(Result);
+    }
+}
+
 internal sealed class FakeLauncher : ILauncher
 {
     public Task<LaunchResult> LaunchAsync(

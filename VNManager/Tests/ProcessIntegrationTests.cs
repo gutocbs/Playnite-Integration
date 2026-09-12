@@ -119,6 +119,51 @@ public sealed class ProcessIntegrationTests
     }
 
     [Fact]
+    public async Task ProcessCleanup_StopsConfiguredServiceInsteadOfKillingItsProcess()
+    {
+        var serviceStopper = new FakeServiceStopper();
+        var cleanup = new ProcessCleanup(
+            new ProcessManagementOptions
+            {
+                GlobalCleanupServices = ["UCManSvc"],
+                Executables =
+                [
+                    new ExecutableCleanupOptions
+                    {
+                        Name = "VnTestShort.exe",
+                        CleanupServices = ["GameSpecificService"]
+                    }
+                ]
+            },
+            new NullLogger(),
+            serviceStopper);
+
+        var result = await cleanup.TerminateForMonitoredProcessAsync(
+            "VnTestShort.exe",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(["UCManSvc", "GameSpecificService"], serviceStopper.ServiceNames);
+        Assert.Equal(0, result.ProcessesFound);
+        Assert.Equal(0, result.ProcessesTerminated);
+        Assert.Empty(result.Failures);
+    }
+
+    [Fact]
+    public async Task ProcessCleanup_AcceptsLegacyNullServiceStopperWhenNoServicesAreConfigured()
+    {
+        var cleanup = new ProcessCleanup(
+            new ProcessManagementOptions(),
+            new NullLogger(),
+            null);
+
+        var result = await cleanup.TerminateForMonitoredProcessAsync(
+            "VnTestShort.exe",
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.Failures);
+    }
+
+    [Fact]
     public async Task ProcessMonitor_WhenNoCandidateStarts_ThrowsSpecificTimeout()
     {
         var missingProcessName = $"VnMissing{Guid.NewGuid():N}.exe";

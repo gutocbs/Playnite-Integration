@@ -145,7 +145,15 @@ public sealed class LocaleEmulatorLauncher(
                 LogLevel.Warning,
                 "LocaleEmulator",
                 "Process cleanup did not complete",
-                new Dictionary<string, object?> { ["Error"] = exception.Message });
+                CleanupErrorData(exception));
         }
     }
+
+    private static IReadOnlyDictionary<string, object?> CleanupErrorData(Exception exception) =>
+        new Dictionary<string, object?>
+        {
+            ["ExceptionType"] = exception.GetType().FullName,
+            ["Error"] = exception.Message,
+            ["StackTrace"] = exception.ToString()
+        };
 }
