@@ -1,6 +1,6 @@
-# VNManager
+# Playnite-Integration
 
-VNManager is a Windows launcher compatibility layer for visual novels in [Playnite](https://playnite.link/). It keeps Playnite-specific integration at the edge and runs launch, process supervision, cleanup, and error handling in a standalone .NET runtime.
+Playnite-Integration is a Windows launcher compatibility layer for visual novels in [Playnite](https://playnite.link/). It keeps Playnite-specific integration at the edge and runs launch, process supervision, cleanup, and error handling in a standalone .NET runtime.
 
 It is intended for games that need a launcher such as **Locale Emulator** or **NoRegionLoader**, especially when the original game executable is only a short-lived bootstrapper.
 
@@ -83,7 +83,7 @@ Copy the resulting plugin build output, including its dependency files and `exte
 
 ## Process monitoring and cleanup
 
-`process-management.json` determines which processes may be observed and which resources may be cleaned up. `monitorProcesses` are checked during the configured `preferredProcessDetectionWindowSeconds` before accepting the requested executable. This lets VNManager track a real engine started by a short-lived launcher.
+`process-management.json` determines which processes may be observed and which resources may be cleaned up. `monitorProcesses` are checked during the configured `preferredProcessDetectionWindowSeconds` before accepting the requested executable. This lets Playnite-Integration track a real engine started by a short-lived launcher.
 
 Cleanup is deliberately opt-in:
 
