@@ -37,12 +37,13 @@ public static class InstallEligibility
             return InstallEligibilityResult.Rejected(InstallEligibilityRejection.Installed);
         }
 
-        if (string.IsNullOrWhiteSpace(game.InstallDirectory) || !fileProbe.Exists(game.InstallDirectory))
+        var sourcePath = game.InstallDirectory ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(sourcePath) || !fileProbe.Exists(sourcePath))
         {
             return InstallEligibilityResult.Rejected(InstallEligibilityRejection.SourceMissing);
         }
 
-        if (!string.Equals(Path.GetExtension(game.InstallDirectory), ".rar", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Path.GetExtension(sourcePath), ".rar", StringComparison.OrdinalIgnoreCase))
         {
             return InstallEligibilityResult.Rejected(InstallEligibilityRejection.UnsupportedSource);
         }

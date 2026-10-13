@@ -84,6 +84,8 @@ public sealed record InstalledGameResult(
     string WorkingDirectory,
     DateTimeOffset CompletedAtUtc);
 
+public sealed record PlayniteAcknowledgement(int SchemaVersion, Guid RequestId, Guid WorkflowId, Guid PlayniteGameId, DateTimeOffset AppliedAtUtc);
+
 public sealed record ProtocolReadResult<T>(bool IsSuccess, T? Value, ProtocolErrorCode ErrorCode)
 {
     public static ProtocolReadResult<T> Success(T value) => new(true, value, ProtocolErrorCode.None);
