@@ -54,3 +54,4 @@ TestResult.xml
 nunit-*.xml
 /.obsidian
 /VNManager/.idea
+.worktrees/
