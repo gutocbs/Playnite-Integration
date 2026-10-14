@@ -22,6 +22,8 @@ public sealed class AtomicTransportFileStore(TransportPaths paths)
             .ToArray();
     }
 
+    public InstallationRequest? ReadRequest(Guid requestId) => TryRead<InstallationRequest>(Paths.RequestPath(requestId));
+
     public IReadOnlyList<Guid> GetAcknowledgedCleanupCandidates(DateTimeOffset olderThan)
     {
         if (!Directory.Exists(Paths.AcknowledgementsDirectory)) return Array.Empty<Guid>();

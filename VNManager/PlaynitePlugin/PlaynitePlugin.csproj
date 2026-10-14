@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="PlayniteSDK" Version="6.16.0" />
+    <ProjectReference Include="..\PlayniteInstallation\PlayniteInstallation.csproj" />
     <None Include="..\LauncherSupervisor\bin\Release\net10.0\publish\**\*" Link="%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="extension.yaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

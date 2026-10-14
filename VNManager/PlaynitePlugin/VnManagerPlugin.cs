@@ -6,15 +6,36 @@ using System.Text.RegularExpressions;
 using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
+using Playnite.SDK.Events;
+using VnManager.PlaynitePlugin.Installation;
 
 namespace VnManager.PlaynitePlugin;
 
 public sealed class VnManagerPlugin : GenericPlugin
 {
     private readonly ILogger _logger = LogManager.GetLogger(nameof(VnManagerPlugin));
+    private readonly PluginInstallWorkflowCoordinator _installCoordinator;
     public override Guid Id => Guid.Parse("0e1b3f2c-56f4-4eaf-bb7b-7f2c02aa5c5a");
 
-    public VnManagerPlugin(IPlayniteAPI api) : base(api) { }
+    public VnManagerPlugin(IPlayniteAPI api) : base(api)
+    {
+        var transportRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VNOrchestrator", "Transport");
+        var orchestratorPath = Path.Combine(GetPluginUserDataPath(), "VNInstallOrchestrator.exe");
+        _installCoordinator = new PluginInstallWorkflowCoordinator(api, transportRoot, orchestratorPath);
+    }
+
+    public override IEnumerable<InstallController> GetInstallActions(GetInstallActionsArgs args)
+    {
+        if (_installCoordinator.IsEligible(args.Game))
+        {
+            yield return new OrchestratorInstallController(args.Game, _installCoordinator);
+        }
+    }
+
+    public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
+    {
+        _installCoordinator.ReconcilePendingResults();
+    }
 
     public override IEnumerable<PlayController> GetPlayActions(GetPlayActionsArgs args)
     {
@@ -81,5 +102,21 @@ public sealed class VnManagerPlugin : GenericPlugin
             TrackingMode = TrackingMode.Process
         };
         yield return controller;
+    }
+}
+
+internal sealed class OrchestratorInstallController : InstallController
+{
+    private readonly PluginInstallWorkflowCoordinator coordinator;
+
+    public OrchestratorInstallController(Game game, PluginInstallWorkflowCoordinator coordinator) : base(game)
+    {
+        this.coordinator = coordinator;
+        Name = "VN Orchestrator";
+    }
+
+    public override void Install(InstallActionArgs args)
+    {
+        coordinator.Dispatch(Game);
     }
 }
