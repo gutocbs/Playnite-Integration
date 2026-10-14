@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Playnite.SDK;
 using Playnite.SDK.Models;
@@ -19,9 +20,38 @@ public sealed class VnManagerPlugin : GenericPlugin
 
     public VnManagerPlugin(IPlayniteAPI api) : base(api)
     {
+        InstallPrivateAssemblyResolver();
         var transportRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VNOrchestrator", "Transport");
         var orchestratorPath = Path.Combine(GetPluginUserDataPath(), "VNInstallOrchestrator.exe");
         _installCoordinator = new PluginInstallWorkflowCoordinator(api, transportRoot, orchestratorPath);
+    }
+
+    private static void InstallPrivateAssemblyResolver()
+    {
+        var extensionDirectory = Path.GetDirectoryName(typeof(VnManagerPlugin).Assembly.Location);
+        if (string.IsNullOrWhiteSpace(extensionDirectory))
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
+        {
+            var requestedAssembly = new AssemblyName(args.Name);
+            var candidatePath = Path.Combine(extensionDirectory, requestedAssembly.Name + ".dll");
+            if (!File.Exists(candidatePath))
+            {
+                return null;
+            }
+
+            try
+            {
+                return Assembly.LoadFrom(candidatePath);
+            }
+            catch (BadImageFormatException)
+            {
+                return null;
+            }
+        };
     }
 
     public override IEnumerable<InstallController> GetInstallActions(GetInstallActionsArgs args)
