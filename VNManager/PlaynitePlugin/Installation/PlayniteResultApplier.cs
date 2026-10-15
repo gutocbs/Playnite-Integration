@@ -1,46 +1,79 @@
+using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using Playnite.SDK;
 using Playnite.SDK.Models;
+using VNInstallation.Protocol.Contracts;
+using VNInstallation.Protocol.Serialization;
+using VNInstallation.Protocol.Transport;
 using VnManager.PlayniteInstallation.Domain;
 using VnManager.PlayniteInstallation.Transport;
 
 namespace VnManager.PlaynitePlugin.Installation;
 
-internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFileStore store)
+internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFileStore store, ILogger logger, IOrchestratorWakeSignal orchestratorWakeSignal, Action scheduleRetry, Action<Guid, Guid, string> completeInstall)
 {
     public void ApplyPending()
     {
         foreach (var result in store.ReadResults())
         {
-            var request = store.ReadRequest(result.RequestId);
-            var game = api.Database.Games.Get(result.PlayniteGameId);
-            var decision = ResultApplicationPolicy.Evaluate(game is null || request is null ? null : Snapshot(game, request), result);
-            if (!decision.IsApplicable)
+            try
             {
-                api.Notifications.Add("VNOrchestrator", "A instalação concluída não pôde ser sincronizada: " + decision.Conflict, NotificationType.Error);
-                continue;
-            }
+                using var gameOperation = GameOperationLock.TryAcquire(result.PlayniteGameId);
+                if (gameOperation is null)
+                {
+                    logger.Info($"VN Orchestrator result deferred because the game operation lock is busy. RequestId='{result.RequestId}', GameId='{result.PlayniteGameId}'.");
+                    scheduleRetry();
+                    continue;
+                }
+                if (store.IsSuperseded(result.RequestId))
+                {
+                    logger.Info($"VN Orchestrator result ignored because it was superseded. RequestId='{result.RequestId}', GameId='{result.PlayniteGameId}'.");
+                    continue;
+                }
+                logger.Info($"VN Orchestrator result detected. RequestId='{result.RequestId}', WorkflowId='{result.WorkflowId}', GameId='{result.PlayniteGameId}'.");
+                var game = api.Database.Games.Get(result.PlayniteGameId);
+                var decision = ResultApplicationPolicy.Evaluate(game is null ? null : Snapshot(game, result), result);
+                if (!decision.IsApplicable)
+                {
+                    logger.Warn($"VN Orchestrator result rejected. RequestId='{result.RequestId}', Conflict='{decision.Conflict}'.");
+                    api.Notifications.Add("VNOrchestrator", "A instalação concluída não pôde ser sincronizada: " + decision.Conflict, NotificationType.Error);
+                    continue;
+                }
 
-            var mutation = decision.Mutation!;
-            game.IsInstalled = mutation.IsInstalled;
-            game.InstallDirectory = mutation.InstallDirectory;
-            var managed = game.GameActions.SingleOrDefault(action => action.Name == ResultApplicationPolicy.ManagedActionName);
-            if (managed is null)
-            {
-                managed = new GameAction { Name = ResultApplicationPolicy.ManagedActionName };
-                game.GameActions.Add(managed);
+                var mutation = decision.Mutation!;
+                game.IsInstalled = mutation.IsInstalled;
+                game.InstallDirectory = mutation.InstallDirectory;
+                game.GameActions ??= new ObservableCollection<GameAction>();
+                var managed = game.GameActions.SingleOrDefault(action => action.Name == ResultApplicationPolicy.ManagedActionName);
+                if (managed is null)
+                {
+                    managed = new GameAction { Name = ResultApplicationPolicy.ManagedActionName };
+                    game.GameActions.Add(managed);
+                }
+                managed.Type = GameActionType.File;
+                managed.Path = result.ExecutablePath;
+                managed.WorkingDir = result.WorkingDirectory;
+                api.Database.Games.Update(game);
+                completeInstall(result.RequestId, result.PlayniteGameId, result.InstallationDirectory);
+                store.WriteAcknowledgement(new PlayniteAcknowledgement(ProtocolV1.SchemaVersion, result.RequestId, result.WorkflowId, result.PlayniteGameId, System.DateTimeOffset.UtcNow));
+                try { orchestratorWakeSignal.Signal(); }
+                catch (Exception exception) { logger.Warn($"VN Orchestrator acknowledgement wake signal failed. RequestId='{result.RequestId}', Exception='{exception}'."); }
+                logger.Info($"VN Orchestrator result applied. RequestId='{result.RequestId}', GameId='{result.PlayniteGameId}'.");
             }
-            managed.Type = GameActionType.File;
-            managed.Path = result.ExecutablePath;
-            managed.WorkingDir = result.WorkingDirectory;
-            api.Database.Games.Update(game);
-            store.WriteAcknowledgement(new VnManager.PlayniteInstallation.Contracts.PlayniteAcknowledgement(1, result.RequestId, result.WorkflowId, result.PlayniteGameId, System.DateTimeOffset.UtcNow));
+            catch (Exception exception)
+            {
+                try { logger.Error($"VN Orchestrator result application failed. RequestId='{result.RequestId}', Exception='{exception}'."); }
+                catch { }
+                try { api.Notifications.Add("VNOrchestrator", "A instalação concluída não pôde ser sincronizada. Consulte o log do Playnite.", NotificationType.Error); }
+                catch { }
+            }
         }
     }
 
-    private static CurrentGameSnapshot Snapshot(Game game, VnManager.PlayniteInstallation.Contracts.InstallationRequest request) => new(
-        game.Id, game.IsInstalled, game.InstallDirectory, request.RequestId, request.SourceFingerprint,
-        game.GameActions.Select(action => new GameActionSnapshot(action.Name, action.Path, action.WorkingDir, DirectGameActionType.File)).ToArray(),
+    private static CurrentGameSnapshot Snapshot(Game game, InstalledGameResult result) => new(
+        game.Id, game.IsInstalled, game.InstallDirectory, result.RequestId, result.SourceFingerprint,
+        game.GameActions?.Select(action => new GameActionSnapshot(action.Name, action.Path, action.WorkingDir, DirectGameActionType.File)).ToArray() ?? Array.Empty<GameActionSnapshot>(),
         new Dictionary<string, string>());
 }

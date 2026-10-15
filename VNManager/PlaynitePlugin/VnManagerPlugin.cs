@@ -64,7 +64,12 @@ public sealed class VnManagerPlugin : GenericPlugin
 
     public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
     {
-        _installCoordinator.ReconcilePendingResults();
+        _installCoordinator.StartResultSynchronization();
+    }
+
+    public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
+    {
+        _installCoordinator.Dispose();
     }
 
     public override IEnumerable<PlayController> GetPlayActions(GetPlayActionsArgs args)
@@ -147,6 +152,8 @@ internal sealed class OrchestratorInstallController : InstallController
 
     public override void Install(InstallActionArgs args)
     {
-        coordinator.Dispatch(Game);
+        coordinator.Dispatch(Game, Complete);
     }
+
+    private void Complete(string installationDirectory) => InvokeOnInstalled(new GameInstalledEventArgs(new GameInstallationData { InstallDirectory = installationDirectory }));
 }

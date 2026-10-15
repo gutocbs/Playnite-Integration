@@ -1,4 +1,5 @@
-using VnManager.PlayniteInstallation.Contracts;
+using VNInstallation.Protocol.Contracts;
+using VNInstallation.Protocol.Serialization;
 
 namespace VnManager.PlayniteInstallation.Tests;
 
@@ -37,6 +38,34 @@ public sealed class ProtocolV1Tests
         Assert.True(result.IsSuccess);
     }
 
+    [Theory]
+    [InlineData(InteractionKind.SelectInstallerExecutable, InteractionOutcome.Selected)]
+    [InlineData(InteractionKind.SelectInstallationDirectory, InteractionOutcome.Cancelled)]
+    [InlineData(InteractionKind.SelectGameExecutable, InteractionOutcome.Confirmed)]
+    [InlineData(InteractionKind.ConfirmDirectInstallerLaunch, InteractionOutcome.Declined)]
+    public void Interaction_contract_round_trips_all_kinds_and_outcomes(InteractionKind kind, InteractionOutcome outcome)
+    {
+        var request = CreateInteractionRequest(kind);
+        var response = new PlayniteInteractionResponse(1, request.InteractionId, request.RequestId, request.WorkflowId,
+            request.PlayniteGameId, kind, outcome, @"K:\ゲーム\本編\game.exe", DateTimeOffset.UtcNow);
+        var requestJson = ProtocolV1.Serialize(request).TrimEnd('}') + ",\"futureField\":true}";
+        var responseJson = ProtocolV1.Serialize(response).TrimEnd('}') + ",\"futureField\":true}";
+
+        Assert.Equal(request, ProtocolV1.DeserializeInteractionRequest(requestJson).Value);
+        Assert.Equal(response, ProtocolV1.DeserializeInteractionResponse(responseJson).Value);
+    }
+
+    [Fact]
+    public void Interaction_contract_rejects_schema_2()
+    {
+        var request = CreateInteractionRequest(InteractionKind.SelectGameExecutable) with { SchemaVersion = 2 };
+
+        var result = ProtocolV1.DeserializeInteractionRequest(ProtocolV1.Serialize(request));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ProtocolErrorCode.IncompatibleSchema, result.ErrorCode);
+    }
+
     [Fact]
     public void CreateSourceFingerprint_is_deterministic_for_same_source_snapshot()
     {
@@ -54,4 +83,7 @@ public sealed class ProtocolV1Tests
         @"K:\\Game.rar",
         "fingerprint",
         new DateTimeOffset(2026, 10, 13, 0, 0, 0, TimeSpan.Zero));
+    private static PlayniteInteractionRequest CreateInteractionRequest(InteractionKind kind) => new(
+        1, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), @"K:\原本.rar", "fingerprint", kind,
+        "Escolha", "Selecione o caminho", @"K:\ゲーム\本編", "Executáveis|*.exe", DateTimeOffset.UtcNow);
 }

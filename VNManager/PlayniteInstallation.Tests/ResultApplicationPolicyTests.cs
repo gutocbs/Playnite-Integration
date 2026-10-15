@@ -1,4 +1,5 @@
-using VnManager.PlayniteInstallation.Contracts;
+using VNInstallation.Protocol.Contracts;
+using VNInstallation.Protocol.Serialization;
 using VnManager.PlayniteInstallation.Domain;
 
 namespace VnManager.PlayniteInstallation.Tests;

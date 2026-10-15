@@ -1,5 +1,6 @@
-using VnManager.PlayniteInstallation.Contracts;
-using VnManager.PlayniteInstallation.Transport;
+using VNInstallation.Protocol.Contracts;
+using VNInstallation.Protocol.Serialization;
+using VNInstallation.Protocol.Transport;
 
 namespace VnManager.PlayniteInstallation.Tests;
 
@@ -36,6 +37,17 @@ public sealed class AtomicTransportFileStoreTests : IDisposable
     }
 
     [Fact]
+    public void Superseded_request_is_visible_to_result_consumers()
+    {
+        var store = new AtomicTransportFileStore(new TransportPaths(root));
+        var requestId = Guid.NewGuid();
+
+        store.MarkSuperseded(requestId);
+
+        Assert.True(store.IsSuperseded(requestId));
+    }
+
+    [Fact]
     public void CleanupCandidates_includes_only_a_fully_acknowledged_old_triplet()
     {
         var store = new AtomicTransportFileStore(new TransportPaths(root));
@@ -49,6 +61,29 @@ public sealed class AtomicTransportFileStoreTests : IDisposable
         File.SetLastWriteTimeUtc(store.Paths.AcknowledgementPath(request.RequestId), DateTime.UtcNow.AddDays(-91));
 
         Assert.Contains(request.RequestId, store.GetAcknowledgedCleanupCandidates(DateTimeOffset.UtcNow.AddDays(-90)));
+    }
+
+    [Fact]
+    public void Interaction_store_separates_requests_and_responses_and_never_overwrites()
+    {
+        var store = new AtomicTransportFileStore(new TransportPaths(root));
+        var request = new PlayniteInteractionRequest(1, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            @"K:\原本.rar", "fingerprint", InteractionKind.SelectInstallationDirectory, "Escolha", "Selecione o caminho",
+            @"K:\ゲーム\本編", null, DateTimeOffset.UtcNow);
+        var response = new PlayniteInteractionResponse(1, request.InteractionId, request.RequestId, request.WorkflowId,
+            request.PlayniteGameId, request.Kind, InteractionOutcome.Selected, @"K:\ゲーム\本編\game.exe", DateTimeOffset.UtcNow);
+
+        store.WriteInteractionRequest(request);
+        store.WriteInteractionResponse(response);
+
+        Assert.Single(store.ReadInteractionRequests());
+        Assert.Single(store.ReadInteractionResponses());
+        Assert.Throws<IOException>(() => store.WriteInteractionRequest(request));
+        Assert.Throws<IOException>(() => store.WriteInteractionResponse(response));
+        store.DeleteInteractionRequest(request.InteractionId);
+        store.DeleteInteractionResponse(request.InteractionId);
+        Assert.Empty(store.ReadInteractionRequests());
+        Assert.Empty(store.ReadInteractionResponses());
     }
 
     public void Dispose()

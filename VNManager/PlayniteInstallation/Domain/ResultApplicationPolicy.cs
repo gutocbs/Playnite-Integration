@@ -1,4 +1,4 @@
-using VnManager.PlayniteInstallation.Contracts;
+using VNInstallation.Protocol.Contracts;
 
 namespace VnManager.PlayniteInstallation.Domain;
 

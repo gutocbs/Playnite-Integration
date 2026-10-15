@@ -6,6 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="VNInstallation.Protocol" Version="1.0.0-alpha.1" />
   </ItemGroup>
 </Project>

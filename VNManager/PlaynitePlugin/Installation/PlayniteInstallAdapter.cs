@@ -2,7 +2,8 @@ using System;
 using System.IO;
 using System.Linq;
 using Playnite.SDK.Models;
-using VnManager.PlayniteInstallation.Contracts;
+using VNInstallation.Protocol.Contracts;
+using VNInstallation.Protocol.Serialization;
 using VnManager.PlayniteInstallation.Domain;
 
 namespace VnManager.PlaynitePlugin.Installation;

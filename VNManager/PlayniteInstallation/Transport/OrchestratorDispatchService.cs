@@ -1,4 +1,5 @@
-using VnManager.PlayniteInstallation.Contracts;
+using VNInstallation.Protocol.Contracts;
+using VNInstallation.Protocol.Transport;
 
 namespace VnManager.PlayniteInstallation.Transport;
 
