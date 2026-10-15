@@ -74,8 +74,9 @@ written to its own repository-local `artifacts\orchestrator-publish` folder.
 No installed Playnite files are modified. This repository owns Playnite
 integration, launcher supervision, and persistence; the protocol repository
 owns the shared wire contracts and transport; the Orchestrator owns the
-installation workflow and UI. The Install-button/no-log regression is deferred
-to the first task of Plan 2.
+installation workflow and UI. The gate can use `-SkipIntegrationFixtures`
+when the process-fixture runner is intentionally excluded from a local check.
+The Install-button/no-log regression is deferred to the first task of Plan 2.
 
 ### Configure a Playnite game
 
