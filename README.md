@@ -57,7 +57,7 @@ The checked-in tool paths are examples. Do not commit local installation paths o
 ### Shared installation protocol verification
 
 `PlayniteInstallation` and `PlaynitePlugin` consume the exact
-`VNInstallation.Protocol` package version `1.0.0-alpha.1` from the local feed
+`VNInstallation.Protocol` package version `1.0.0-alpha.2` from the local feed
 configured in `NuGet.Config`. Run the non-deploying cross-repository gate from
 the protocol checkout:
 
