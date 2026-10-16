@@ -25,7 +25,10 @@ internal sealed class PlayniteInteractionDialog(IPlayniteAPI api) : IInteraction
                 var answer = api.Dialogs.ShowMessage(request.Purpose, request.Caption, MessageBoxButton.YesNo);
                 return new InteractionDialogResult(
                     answer == MessageBoxResult.Yes ? InteractionOutcome.Confirmed : InteractionOutcome.Declined,
+                    null,
                     null);
+            case InteractionKind.ConfigureInstallation:
+                return new InstallationConfigurationDialog(api).Show(request);
             default:
                 throw new ArgumentOutOfRangeException(nameof(request.Kind), request.Kind, "Unsupported interaction kind.");
         }
@@ -33,6 +36,6 @@ internal sealed class PlayniteInteractionDialog(IPlayniteAPI api) : IInteraction
 
     private static InteractionDialogResult SelectedOrCancelled(string selectedPath) =>
         string.IsNullOrWhiteSpace(selectedPath)
-            ? new InteractionDialogResult(InteractionOutcome.Cancelled, null)
-            : new InteractionDialogResult(InteractionOutcome.Selected, selectedPath);
+            ? new InteractionDialogResult(InteractionOutcome.Cancelled, null, null)
+            : new InteractionDialogResult(InteractionOutcome.Selected, selectedPath, null);
 }

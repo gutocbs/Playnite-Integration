@@ -91,8 +91,9 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
         try
         {
             logger.Info("VN Orchestrator interaction processing started from signal.");
-            var processed = interactionProcessor.ProcessPending();
-            logger.Info($"VN Orchestrator interaction processing completed from signal. Processed='{processed}'.");
+            var summary = interactionProcessor.ProcessPending();
+            LogRejectedInteractions(summary);
+            logger.Info($"VN Orchestrator interaction processing completed from signal. Processed='{summary.Processed}'.");
         }
         catch (Exception exception)
         {
@@ -108,8 +109,9 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
             try
             {
                 logger.Info($"VN Orchestrator interaction processing started from {trigger}.");
-                var processed = interactionProcessor.ProcessPending();
-                logger.Info($"VN Orchestrator interaction processing completed from {trigger}. Processed='{processed}'.");
+                var summary = interactionProcessor.ProcessPending();
+                LogRejectedInteractions(summary);
+                logger.Info($"VN Orchestrator interaction processing completed from {trigger}. Processed='{summary.Processed}'.");
             }
             catch (Exception exception)
             {
@@ -151,6 +153,14 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
         catch (Exception exception) when (disposed)
         {
             logger.Warn($"VN Orchestrator result synchronization was skipped during shutdown. Exception='{exception}'.");
+        }
+    }
+
+    private void LogRejectedInteractions(InteractionProcessingSummary summary)
+    {
+        foreach (var rejection in summary.Rejected)
+        {
+            logger.Warn($"VN Orchestrator interaction was rejected. InteractionId='{rejection.InteractionId}', RequestId='{rejection.RequestId}', WorkflowId='{rejection.WorkflowId}', GameId='{rejection.PlayniteGameId}', ErrorCode='{rejection.ErrorCode}', Reason='{rejection.Reason}'.");
         }
     }
 
