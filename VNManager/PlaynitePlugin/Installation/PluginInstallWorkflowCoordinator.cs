@@ -31,7 +31,7 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
         this.api = api;
         store = new AtomicTransportFileStore(new TransportPaths(transportRoot));
         dispatch = new OrchestratorDispatchService(store, new OrchestratorProcessActivator(orchestratorPath));
-        resultApplier = new PlayniteResultApplier(api, store, logger, new NamedOrchestratorWakeSignal(OrchestratorWakeEvent.NameForCurrentUser()), () => ScheduleResultSynchronization("lock-contention", TimeSpan.FromMilliseconds(250)), (requestId, gameId, installationDirectory) => installCompletions.TryComplete(requestId, gameId, installationDirectory));
+        resultApplier = new PlayniteResultApplier(api, store, logger, new NamedOrchestratorWakeSignal(OrchestratorWakeEvent.NameForCurrentUser()), () => ScheduleResultSynchronization("lock-contention", TimeSpan.FromMilliseconds(250)), installCompletions.TryComplete);
         uiDispatcher = new PlayniteUiDispatcher(api);
         interactionProcessor = new InteractionRequestProcessor(
             store,

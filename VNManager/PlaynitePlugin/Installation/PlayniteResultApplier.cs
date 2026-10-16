@@ -12,7 +12,7 @@ using VnManager.PlayniteInstallation.Transport;
 
 namespace VnManager.PlaynitePlugin.Installation;
 
-internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFileStore store, ILogger logger, IOrchestratorWakeSignal orchestratorWakeSignal, Action scheduleRetry, Action<Guid, Guid, string> completeInstall)
+internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFileStore store, ILogger logger, IOrchestratorWakeSignal orchestratorWakeSignal, Action scheduleRetry, Func<Guid, Guid, string, bool> completeInstall)
 {
     public void ApplyPending()
     {
@@ -43,21 +43,35 @@ internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFil
                 }
 
                 var mutation = decision.Mutation!;
-                game.IsInstalled = mutation.IsInstalled;
-                game.InstallDirectory = mutation.InstallDirectory;
-                game.GameActions ??= new ObservableCollection<GameAction>();
-                var managed = game.GameActions.SingleOrDefault(action => action.Name == ResultApplicationPolicy.ManagedActionName);
-                if (managed is null)
+                var controllerCompleted = ResultCompletionSequence.Apply(
+                    () => completeInstall(result.RequestId, result.PlayniteGameId, result.InstallationDirectory),
+                    () =>
+                    {
+                        game.IsInstalled = mutation.IsInstalled;
+                        game.InstallDirectory = mutation.InstallDirectory;
+                        game.GameActions ??= new ObservableCollection<GameAction>();
+                        var managed = game.GameActions.SingleOrDefault(action => action.Name == ResultApplicationPolicy.ManagedActionName);
+                        if (managed is null)
+                        {
+                            managed = new GameAction { Name = ResultApplicationPolicy.ManagedActionName };
+                            game.GameActions.Add(managed);
+                        }
+                        managed.Type = GameActionType.File;
+                        managed.Path = result.ExecutablePath;
+                        managed.WorkingDir = result.WorkingDirectory;
+                        managed.IsPlayAction = true;
+                        api.Database.Games.Update(game);
+                    },
+                    () => store.WriteAcknowledgement(new PlayniteAcknowledgement(
+                        ProtocolV1.SchemaVersion,
+                        result.RequestId,
+                        result.WorkflowId,
+                        result.PlayniteGameId,
+                        System.DateTimeOffset.UtcNow)));
+                if (!controllerCompleted)
                 {
-                    managed = new GameAction { Name = ResultApplicationPolicy.ManagedActionName };
-                    game.GameActions.Add(managed);
+                    logger.Info($"VN Orchestrator result had no live install controller; database synchronization continued. RequestId='{result.RequestId}', GameId='{result.PlayniteGameId}'.");
                 }
-                managed.Type = GameActionType.File;
-                managed.Path = result.ExecutablePath;
-                managed.WorkingDir = result.WorkingDirectory;
-                api.Database.Games.Update(game);
-                completeInstall(result.RequestId, result.PlayniteGameId, result.InstallationDirectory);
-                store.WriteAcknowledgement(new PlayniteAcknowledgement(ProtocolV1.SchemaVersion, result.RequestId, result.WorkflowId, result.PlayniteGameId, System.DateTimeOffset.UtcNow));
                 try { orchestratorWakeSignal.Signal(); }
                 catch (Exception exception) { logger.Warn($"VN Orchestrator acknowledgement wake signal failed. RequestId='{result.RequestId}', Exception='{exception}'."); }
                 logger.Info($"VN Orchestrator result applied. RequestId='{result.RequestId}', GameId='{result.PlayniteGameId}'.");
@@ -74,6 +88,6 @@ internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFil
 
     private static CurrentGameSnapshot Snapshot(Game game, InstalledGameResult result) => new(
         game.Id, game.IsInstalled, game.InstallDirectory, result.RequestId, result.SourceFingerprint,
-        game.GameActions?.Select(action => new GameActionSnapshot(action.Name, action.Path, action.WorkingDir, DirectGameActionType.File)).ToArray() ?? Array.Empty<GameActionSnapshot>(),
+        game.GameActions?.Select(action => new GameActionSnapshot(action.Name, action.Path, action.WorkingDir, DirectGameActionType.File, action.IsPlayAction)).ToArray() ?? Array.Empty<GameActionSnapshot>(),
         new Dictionary<string, string>());
 }

@@ -7,7 +7,7 @@ public enum DirectGameActionType
     File
 }
 
-public sealed record GameActionSnapshot(string Name, string Path, string WorkingDirectory, DirectGameActionType Type);
+public sealed record GameActionSnapshot(string Name, string Path, string WorkingDirectory, DirectGameActionType Type, bool IsPlayAction = false);
 
 public sealed record CurrentGameSnapshot(
     Guid GameId,
@@ -50,6 +50,42 @@ public static class ResultApplicationPolicy
 
         if (current.IsInstalled)
         {
+            if (current.PendingRequestId != result.RequestId)
+            {
+                return ResultApplicationDecision.Reject(ResultApplicationConflict.RequestMismatch);
+            }
+
+            if (!string.Equals(current.ExpectedSourceFingerprint, result.SourceFingerprint, StringComparison.Ordinal))
+            {
+                return ResultApplicationDecision.Reject(ResultApplicationConflict.SourceFingerprintMismatch);
+            }
+
+            var managedActions = current.GameActions
+                .Where(action => string.Equals(action.Name, ManagedActionName, StringComparison.Ordinal))
+                .ToArray();
+
+            if (managedActions.Length > 1)
+            {
+                return ResultApplicationDecision.Reject(ResultApplicationConflict.DuplicateManagedAction);
+            }
+
+            if (managedActions.Length == 1
+                && string.Equals(current.InstallDirectory, result.InstallationDirectory, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(managedActions[0].Path, result.ExecutablePath, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(managedActions[0].WorkingDirectory, result.WorkingDirectory, StringComparison.OrdinalIgnoreCase)
+                && managedActions[0].Type == DirectGameActionType.File)
+            {
+                return ResultApplicationDecision.Apply(new GameUpdateMutation(
+                    true,
+                    current.InstallDirectory,
+                    current.GameActions
+                        .Select(action => string.Equals(action.Name, ManagedActionName, StringComparison.Ordinal)
+                            ? action with { IsPlayAction = true }
+                            : action)
+                        .ToArray(),
+                    current.Metadata));
+            }
+
             return ResultApplicationDecision.Reject(ResultApplicationConflict.AlreadyInstalled);
         }
 
@@ -75,7 +111,7 @@ public static class ResultApplicationPolicy
 
         var actions = current.GameActions
             .Where(action => !string.Equals(action.Name, ManagedActionName, StringComparison.Ordinal))
-            .Append(new GameActionSnapshot(ManagedActionName, result.ExecutablePath, result.WorkingDirectory, DirectGameActionType.File))
+            .Append(new GameActionSnapshot(ManagedActionName, result.ExecutablePath, result.WorkingDirectory, DirectGameActionType.File, true))
             .ToArray();
 
         return ResultApplicationDecision.Apply(new GameUpdateMutation(true, result.InstallationDirectory, actions, current.Metadata));

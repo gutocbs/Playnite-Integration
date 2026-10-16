@@ -22,6 +22,32 @@ public sealed class ResultApplicationPolicyTests
         Assert.Equal("value", mutation.Metadata["Unrelated metadata"]);
     }
 
+    [Fact]
+    public void Evaluate_accepts_an_idempotent_retry_after_the_game_update_was_persisted_before_acknowledgement()
+    {
+        var result = Result();
+        var current = Current() with
+        {
+            IsInstalled = true,
+            InstallDirectory = result.InstallationDirectory,
+            GameActions = Current().GameActions
+                .Append(new GameActionSnapshot(
+                    ResultApplicationPolicy.ManagedActionName,
+                    result.ExecutablePath,
+                    result.WorkingDirectory,
+                    DirectGameActionType.File))
+                .ToArray()
+        };
+
+        var decision = ResultApplicationPolicy.Evaluate(current, result);
+
+        Assert.True(decision.IsApplicable);
+        var mutation = Assert.IsType<GameUpdateMutation>(decision.Mutation);
+        Assert.True(mutation.IsInstalled);
+        Assert.Equal(result.InstallationDirectory, mutation.InstallDirectory);
+        Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName);
+    }
+
     [Theory]
     [InlineData(ResultApplicationConflict.MissingGame)]
     [InlineData(ResultApplicationConflict.AlreadyInstalled)]
