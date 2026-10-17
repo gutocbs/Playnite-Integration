@@ -11,9 +11,9 @@ public sealed record ProcessManagementOptions
 
     public int GlobalTimeout { get; init; }
 
-    public IReadOnlyList<string> GlobalCleanupProcesses { get; init; } = [];
+    public IReadOnlyList<string>? GlobalCleanupProcesses { get; init; }
 
-    public IReadOnlyList<string> GlobalCleanupServices { get; init; } = [];
+    public IReadOnlyList<string>? GlobalCleanupServices { get; init; }
 
     public IReadOnlyList<ExecutableCleanupOptions> Executables { get; init; } = [];
 }
@@ -24,7 +24,7 @@ public sealed record ExecutableCleanupOptions
 
     public int? Timeout { get; init; }
 
-    public IReadOnlyList<string> CleanupProcesses { get; init; } = [];
+    public IReadOnlyList<string>? CleanupProcesses { get; init; }
 
-    public IReadOnlyList<string> CleanupServices { get; init; } = [];
+    public IReadOnlyList<string>? CleanupServices { get; init; }
 }

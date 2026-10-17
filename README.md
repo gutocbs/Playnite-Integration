@@ -54,6 +54,30 @@ Update the configuration copied beside the Host executable before launching a ga
 
 The checked-in tool paths are examples. Do not commit local installation paths or game-specific configuration.
 
+### Shared installation protocol verification
+
+`PlayniteInstallation` and `PlaynitePlugin` consume the exact
+`VNInstallation.Protocol` package version `1.0.0-alpha.2` from the local feed
+configured in `NuGet.Config`. Run the non-deploying cross-repository gate from
+the protocol checkout:
+
+```powershell
+pwsh -File "F:\Playnite Integration\Playnite VN Protocol\scripts\verify-consumers.ps1" `
+  -ProtocolRoot "F:\Playnite Integration\Playnite VN Protocol" `
+  -OrchestratorRoot "F:\Playnite Integration\Playnite VN Installer\.worktrees\vn-orchestrator-plugin" `
+  -PlayniteIntegrationRoot "F:\Playnite Integration\Playnite VN Manager\.worktrees\vn-orchestrator-plugin"
+```
+
+The plugin validation artifact is written to
+`artifacts\plugin-release` in this worktree, and the Orchestrator publish is
+written to its own repository-local `artifacts\orchestrator-publish` folder.
+No installed Playnite files are modified. This repository owns Playnite
+integration, launcher supervision, and persistence; the protocol repository
+owns the shared wire contracts and transport; the Orchestrator owns the
+installation workflow and UI. The gate can use `-SkipIntegrationFixtures`
+when the process-fixture runner is intentionally excluded from a local check.
+The Install-button/no-log regression is deferred to the first task of Plan 2.
+
 ### Configure a Playnite game
 
 Add exactly one feature to the game in Playnite:
