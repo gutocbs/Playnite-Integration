@@ -48,19 +48,16 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
     {
         var request = PlayniteInstallAdapter.CreateRequest(game);
         installCompletions.Register(request.RequestId, game.Id, completeInstall, cancelInstall);
-        var task = dispatch.DispatchAsync(request);
-        task.ContinueWith(completed =>
+        try
         {
-            if (completed.IsFaulted || !completed.Result.OrchestratorActivated)
-            {
-                installCompletions.Remove(request.RequestId);
-                api.Notifications.Add("VNOrchestrator", "A solicitação foi salva, mas o VN Install Orchestrator não pôde ser iniciado.", NotificationType.Error);
-            }
-            else
-            {
-                uiDispatcher.BeginInvoke(() => MonitorPreparation(request));
-            }
-        });
+            dispatch.PersistRequest(request);
+            uiDispatcher.BeginInvoke(() => MonitorPreparation(request));
+        }
+        catch (Exception)
+        {
+            CancelLiveInstall(request, publishCancellation: false);
+            api.Notifications.Add("VNOrchestrator", "A solicitação não pôde ser preparada para extração.", NotificationType.Error);
+        }
     }
 
     public void StartResultSynchronization()
@@ -88,10 +85,13 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
     {
         PreparationOutcome outcome = null;
         var cancelled = false;
+        DispatchResult activation = null;
         var progress = api.Dialogs.ActivateGlobalProgress(args =>
         {
             args.Text = "Extraindo arquivos do jogo...";
             args.IsIndeterminate = true;
+            activation = dispatch.ActivateAsync().GetAwaiter().GetResult();
+            if (!activation.OrchestratorActivated) return;
             while (!args.CancelToken.IsCancellationRequested)
             {
                 outcome = store.ConsumePreparationOutcome(request.RequestId, request.PlayniteGameId);
@@ -101,26 +101,38 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
             cancelled = true;
         }, new GlobalProgressOptions("Extraindo arquivos do jogo...", true) { IsIndeterminate = true });
 
+        if (activation is null || !activation.OrchestratorActivated)
+        {
+            CancelLiveInstall(request, publishCancellation: true);
+            api.Notifications.Add("VNOrchestrator", "A solicitação foi salva, mas o VN Install Orchestrator não pôde ser iniciado.", NotificationType.Error);
+            return;
+        }
         if (cancelled || progress.Canceled)
         {
-            installCompletions.TryCancel(request.RequestId, request.PlayniteGameId);
-            _ = dispatch.DispatchCancellationAsync(request.RequestId, request.PlayniteGameId);
+            CancelLiveInstall(request, publishCancellation: true);
             return;
         }
         if (outcome is null || outcome.Outcome == PreparationOutcomeKind.Failed)
         {
-            installCompletions.TryCancel(request.RequestId, request.PlayniteGameId);
+            CancelLiveInstall(request, publishCancellation: false);
             api.Notifications.Add("VNOrchestrator", "Não foi possível preparar os arquivos do jogo. Consulte o log do Orchestrator.", NotificationType.Error);
             return;
         }
+        if (outcome.Outcome == PreparationOutcomeKind.PreparedWithoutInstallerLaunch) return;
         _ = dispatch.DispatchInstallerLaunchAsync(outcome).ContinueWith(completed =>
         {
             if (completed.IsFaulted || !completed.Result.OrchestratorActivated)
             {
-                installCompletions.TryCancel(request.RequestId, request.PlayniteGameId);
+                CancelLiveInstall(request, publishCancellation: true);
                 api.Notifications.Add("VNOrchestrator", "O instalador não pôde ser iniciado.", NotificationType.Error);
             }
         });
+    }
+
+    private void CancelLiveInstall(VNInstallation.Protocol.Contracts.InstallationRequest request, bool publishCancellation)
+    {
+        installCompletions.TryCancel(request.RequestId, request.PlayniteGameId);
+        if (publishCancellation) _ = dispatch.DispatchCancellationAsync(request.RequestId, request.PlayniteGameId);
     }
 
     private void ApplyTerminalOutcomes()

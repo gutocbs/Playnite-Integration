@@ -8,9 +8,14 @@ public sealed record DispatchResult(bool RequestPersisted, bool OrchestratorActi
 
 public sealed class OrchestratorDispatchService(AtomicTransportFileStore store, IOrchestratorLauncher launcher)
 {
-    public async Task<DispatchResult> DispatchAsync(InstallationRequest request, CancellationToken cancellationToken = default)
+    public DispatchResult PersistRequest(InstallationRequest request)
     {
         store.WriteRequest(request);
+        return new DispatchResult(true, false, null);
+    }
+
+    public async Task<DispatchResult> ActivateAsync(CancellationToken cancellationToken = default)
+    {
         try
         {
             await launcher.ActivateAsync(cancellationToken).ConfigureAwait(false);
@@ -20,6 +25,12 @@ public sealed class OrchestratorDispatchService(AtomicTransportFileStore store, 
         {
             return new DispatchResult(true, false, exception);
         }
+    }
+
+    public async Task<DispatchResult> DispatchAsync(InstallationRequest request, CancellationToken cancellationToken = default)
+    {
+        PersistRequest(request);
+        return await ActivateAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public Task<DispatchResult> DispatchInstallerLaunchAsync(

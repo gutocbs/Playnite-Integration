@@ -6,6 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="VNInstallation.Protocol" Version="1.0.0-alpha.5" />
+    <PackageReference Include="VNInstallation.Protocol" Version="1.0.0-alpha.6" />
   </ItemGroup>
 </Project>
