@@ -51,6 +51,20 @@ public sealed class OrchestratorDispatchService(AtomicTransportFileStore store, 
         return DispatchCommandAsync(() => store.WriteInstallerLaunchCommand(command), cancellationToken);
     }
 
+    public Task<DispatchResult> DispatchPortableConfigurationAsync(
+        PreparationOutcome prepared,
+        CancellationToken cancellationToken = default)
+    {
+        if (prepared.Outcome != PreparationOutcomeKind.PreparedWithoutInstallerLaunch)
+        {
+            throw new InvalidOperationException("Only a portable prepared outcome can publish portable configuration.");
+        }
+
+        var command = new PortableConfigurationCommand(
+            prepared.SchemaVersion, prepared.RequestId, prepared.WorkflowId, prepared.PlayniteGameId, DateTimeOffset.UtcNow);
+        return DispatchCommandAsync(() => store.WritePortableConfigurationCommand(command), cancellationToken);
+    }
+
     public Task<DispatchResult> DispatchCancellationAsync(
         Guid requestId,
         Guid playniteGameId,

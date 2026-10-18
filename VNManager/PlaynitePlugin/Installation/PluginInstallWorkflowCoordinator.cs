@@ -118,7 +118,18 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
             api.Notifications.Add("VNOrchestrator", "Não foi possível preparar os arquivos do jogo. Consulte o log do Orchestrator.", NotificationType.Error);
             return;
         }
-        if (outcome.Outcome == PreparationOutcomeKind.PreparedWithoutInstallerLaunch) return;
+        if (outcome.Outcome == PreparationOutcomeKind.PreparedWithoutInstallerLaunch)
+        {
+            _ = dispatch.DispatchPortableConfigurationAsync(outcome).ContinueWith(completed =>
+            {
+                if (completed.IsFaulted || !completed.Result.OrchestratorActivated)
+                {
+                    CancelLiveInstall(request, publishCancellation: true);
+                    api.Notifications.Add("VNOrchestrator", "A configuração portátil não pôde ser iniciada.", NotificationType.Error);
+                }
+            });
+            return;
+        }
         _ = dispatch.DispatchInstallerLaunchAsync(outcome).ContinueWith(completed =>
         {
             if (completed.IsFaulted || !completed.Result.OrchestratorActivated)
