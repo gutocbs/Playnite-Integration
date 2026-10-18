@@ -32,6 +32,19 @@ internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFil
                     logger.Info($"VN Orchestrator result ignored because it was superseded. RequestId='{result.RequestId}', GameId='{result.PlayniteGameId}'.");
                     continue;
                 }
+                var acknowledgementStatus = ResultAcknowledgementPolicy.Evaluate(
+                    result,
+                    store.ReadAcknowledgement(result.RequestId));
+                if (acknowledgementStatus == ResultAcknowledgementStatus.AlreadyApplied)
+                {
+                    logger.Info($"VN Orchestrator result ignored because it was already acknowledged. RequestId='{result.RequestId}', WorkflowId='{result.WorkflowId}', GameId='{result.PlayniteGameId}'.");
+                    continue;
+                }
+                if (acknowledgementStatus == ResultAcknowledgementStatus.Conflict)
+                {
+                    throw new InvalidOperationException(
+                        $"The existing acknowledgement does not match the result correlation. WorkflowId='{result.WorkflowId}', GameId='{result.PlayniteGameId}'.");
+                }
                 logger.Info($"VN Orchestrator result detected. RequestId='{result.RequestId}', WorkflowId='{result.WorkflowId}', GameId='{result.PlayniteGameId}'.");
                 var game = api.Database.Games.Get(result.PlayniteGameId);
                 var decision = ResultApplicationPolicy.Evaluate(game is null ? null : Snapshot(game, result), result);
