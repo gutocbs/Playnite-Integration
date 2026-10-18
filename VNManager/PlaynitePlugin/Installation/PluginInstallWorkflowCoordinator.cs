@@ -5,6 +5,7 @@ using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 using VNInstallation.Protocol.Transport;
+using VNInstallation.Protocol.Contracts;
 using VnManager.PlayniteInstallation.Domain;
 using VnManager.PlayniteInstallation.Transport;
 
@@ -23,6 +24,7 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
     private readonly System.Threading.CancellationTokenSource retryCancellation = new();
     private ResultReadySynchronization resultReadySynchronization;
     private InteractionReadySynchronization interactionReadySynchronization;
+    private TerminalOutcomeSynchronization terminalOutcomeSynchronization;
     private int retryQueued;
     private bool disposed;
 
@@ -42,10 +44,10 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
 
     public bool IsEligible(Game game) => InstallEligibility.Evaluate(PlayniteInstallAdapter.ToSnapshot(game), new FileProbe(), new NoActiveWorkflowLookup()).IsEligible;
 
-    public void Dispatch(Game game, Action<string> completeInstall)
+    public void Dispatch(Game game, Action<string> completeInstall, Action cancelInstall)
     {
         var request = PlayniteInstallAdapter.CreateRequest(game);
-        installCompletions.Register(request.RequestId, game.Id, completeInstall);
+        installCompletions.Register(request.RequestId, game.Id, completeInstall, cancelInstall);
         var task = dispatch.DispatchAsync(request);
         task.ContinueWith(completed =>
         {
@@ -53,6 +55,10 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
             {
                 installCompletions.Remove(request.RequestId);
                 api.Notifications.Add("VNOrchestrator", "A solicitação foi salva, mas o VN Install Orchestrator não pôde ser iniciado.", NotificationType.Error);
+            }
+            else
+            {
+                uiDispatcher.BeginInvoke(() => MonitorPreparation(request));
             }
         });
     }
@@ -67,11 +73,67 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
         {
             interactionReadySynchronization = new InteractionReadySynchronization(TransportEventNames.InteractionReadyNameForCurrentUser(), uiDispatcher, ProcessInteractionsFromSignal);
         }
+        if (terminalOutcomeSynchronization == null)
+        {
+            terminalOutcomeSynchronization = new TerminalOutcomeSynchronization(TransportEventNames.InstallationTerminalOutcomeNameForCurrentUser(), uiDispatcher, ApplyTerminalOutcomes);
+        }
         ScheduleResultSynchronization("startup");
         ScheduleInteractionProcessing("startup");
+        ApplyTerminalOutcomes();
     }
 
     public void ReconcilePendingResults() => resultApplier.ApplyPending();
+
+    private void MonitorPreparation(VNInstallation.Protocol.Contracts.InstallationRequest request)
+    {
+        PreparationOutcome outcome = null;
+        var cancelled = false;
+        var progress = api.Dialogs.ActivateGlobalProgress(args =>
+        {
+            args.Text = "Extraindo arquivos do jogo...";
+            args.IsIndeterminate = true;
+            while (!args.CancelToken.IsCancellationRequested)
+            {
+                outcome = store.ConsumePreparationOutcome(request.RequestId, request.PlayniteGameId);
+                if (outcome != null) return;
+                System.Threading.Thread.Sleep(100);
+            }
+            cancelled = true;
+        }, new GlobalProgressOptions("Extraindo arquivos do jogo...", true) { IsIndeterminate = true });
+
+        if (cancelled || progress.Canceled)
+        {
+            installCompletions.TryCancel(request.RequestId, request.PlayniteGameId);
+            _ = dispatch.DispatchCancellationAsync(request.RequestId, request.PlayniteGameId);
+            return;
+        }
+        if (outcome is null || outcome.Outcome == PreparationOutcomeKind.Failed)
+        {
+            installCompletions.TryCancel(request.RequestId, request.PlayniteGameId);
+            api.Notifications.Add("VNOrchestrator", "Não foi possível preparar os arquivos do jogo. Consulte o log do Orchestrator.", NotificationType.Error);
+            return;
+        }
+        _ = dispatch.DispatchInstallerLaunchAsync(outcome).ContinueWith(completed =>
+        {
+            if (completed.IsFaulted || !completed.Result.OrchestratorActivated)
+            {
+                installCompletions.TryCancel(request.RequestId, request.PlayniteGameId);
+                api.Notifications.Add("VNOrchestrator", "O instalador não pôde ser iniciado.", NotificationType.Error);
+            }
+        });
+    }
+
+    private void ApplyTerminalOutcomes()
+    {
+        foreach (var outcome in store.ReadInstallationTerminalOutcomes())
+        {
+            if (store.ConsumeInstallationTerminalOutcome(outcome.RequestId, outcome.WorkflowId, outcome.PlayniteGameId) is null) continue;
+            if (installCompletions.TryCancel(outcome.RequestId, outcome.PlayniteGameId))
+            {
+                api.Notifications.Add("VNOrchestrator", "O instalador externo não foi concluído. Consulte o log do Orchestrator.", NotificationType.Error);
+            }
+        }
+    }
 
     private void SynchronizeFromSignal()
     {
@@ -177,6 +239,11 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
         {
             interactionReadySynchronization.Dispose();
             interactionReadySynchronization = null;
+        }
+        if (terminalOutcomeSynchronization != null)
+        {
+            terminalOutcomeSynchronization.Dispose();
+            terminalOutcomeSynchronization = null;
         }
         retryCancellation.Dispose();
     }

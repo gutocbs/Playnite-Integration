@@ -152,8 +152,10 @@ internal sealed class OrchestratorInstallController : InstallController
 
     public override void Install(InstallActionArgs args)
     {
-        coordinator.Dispatch(Game, Complete);
+        coordinator.Dispatch(Game, Complete, Cancel);
     }
 
     private void Complete(string installationDirectory) => InvokeOnInstalled(new GameInstalledEventArgs(new GameInstallationData { InstallDirectory = installationDirectory }));
+
+    private void Cancel() => InvokeOnInstallationCancelled(new GameInstallationCancelledEventArgs());
 }
