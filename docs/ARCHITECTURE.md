@@ -143,13 +143,24 @@ Errors keep the `ExecutionId` for log correlation.
 PlaynitePlugin ──(process boundary)──► LauncherSupervisor
                                           │
                                           ▼
-                                        Host ──► LocaleEmulator ─┐
-                                          │      NoRegionLoader ─┤
-                                          │                      ▼
-                                          │              Launcher.Supervision
-                                          │                      │
-                                          ▼                      ▼
-                                     Abstractions ◄──── ProcessManagement ──► Logging
+                                        Host ──► LocaleEmulator, NoRegionLoader
+                                                          │
+                                                          ▼
+                                                 Launcher.Supervision
+                                                          │
+                                                          ▼
+                                                  ProcessManagement ──► Logging
+```
+
+As project references:
+
+```text
+LauncherSupervisor   → Host, Abstractions
+Host                 → Abstractions, LocaleEmulator, NoRegionLoader, Logging, ProcessManagement
+LocaleEmulator       → Abstractions, Logging, ProcessManagement, Launcher.Supervision
+NoRegionLoader       → Abstractions, Logging, ProcessManagement, Launcher.Supervision
+Launcher.Supervision → Abstractions, Logging, ProcessManagement
+ProcessManagement    → Logging
 ```
 
 Concrete launchers reference `Abstractions`, `Logging`, `ProcessManagement` and

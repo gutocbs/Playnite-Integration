@@ -69,10 +69,16 @@ internal sealed class FakeProcessCleanup : IProcessCleanup
 {
     public string? MonitoredProcessName { get; private set; }
 
+    public int CallCount { get; private set; }
+
+    public CancellationToken CancellationToken { get; private set; }
+
     public Task<ProcessCleanupResult> TerminateForMonitoredProcessAsync(
         string? monitoredExecutableOrProcessName,
         CancellationToken cancellationToken = default)
     {
+        CallCount++;
+        CancellationToken = cancellationToken;
         MonitoredProcessName = monitoredExecutableOrProcessName;
         return Task.FromResult(new ProcessCleanupResult(0, 0, []));
     }

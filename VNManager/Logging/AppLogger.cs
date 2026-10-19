@@ -116,7 +116,7 @@ public sealed class AppLogger : IAppLogger
     {
         try
         {
-            var directory = Path.GetDirectoryName(_logPath)!;
+            var directory = Path.GetDirectoryName(_logPath) ?? AppContext.BaseDirectory;
             var baseName = Path.GetFileNameWithoutExtension(_logPath);
             var extension = Path.GetExtension(_logPath);
             var fallbackPath = Path.Combine(

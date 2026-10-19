@@ -20,4 +20,23 @@ public sealed class AppLoggerTests
         Assert.Contains("[INFO] [exec-1] [Component] line1\\nline2 | ", line);
         Assert.EndsWith(@"Path=a\;b\\c\nd; Missing=null", line);
     }
+
+    [Fact]
+    public void Write_FallsBackToBaseDirectory_When_LogPathHasNoDirectory()
+    {
+        var fallbackPath = Path.Combine(AppContext.BaseDirectory, $".{Environment.ProcessId}");
+        File.Delete(fallbackPath);
+
+        try
+        {
+            new AppLogger("exec-1", Path.GetPathRoot(AppContext.BaseDirectory)!).Write(
+                LogLevel.Warning, "Component", "fallback message");
+
+            Assert.Contains("fallback message", File.ReadAllText(fallbackPath));
+        }
+        finally
+        {
+            File.Delete(fallbackPath);
+        }
+    }
 }

@@ -97,6 +97,8 @@ public sealed class NoRegionLoaderLauncherTests
         Assert.False(result.Success);
         Assert.Equal("LAUNCH_CANCELLED", result.Error?.Code);
         Assert.Equal("NoRegionLoader process supervision was cancelled.", result.Error?.Message);
+        Assert.Equal(1, cleanup.CallCount);
+        Assert.False(cleanup.CancellationToken.IsCancellationRequested);
         Assert.Null(cleanup.MonitoredProcessName);
     }
 
