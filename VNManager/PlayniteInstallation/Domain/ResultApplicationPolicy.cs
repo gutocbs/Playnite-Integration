@@ -16,7 +16,8 @@ public sealed record CurrentGameSnapshot(
     Guid PendingRequestId,
     string ExpectedSourceFingerprint,
     IReadOnlyList<GameActionSnapshot> GameActions,
-    IReadOnlyDictionary<string, string> Metadata);
+    IReadOnlyDictionary<string, string> Metadata,
+    bool HasLauncherFeature = false);
 
 public sealed record GameUpdateMutation(bool IsInstalled, string InstallDirectory, IReadOnlyList<GameActionSnapshot> GameActions, IReadOnlyDictionary<string, string> Metadata);
 
@@ -80,7 +81,7 @@ public static class ResultApplicationPolicy
                     current.InstallDirectory,
                     current.GameActions
                         .Select(action => string.Equals(action.Name, ManagedActionName, StringComparison.Ordinal)
-                            ? action with { IsPlayAction = true }
+                            ? action with { IsPlayAction = !current.HasLauncherFeature }
                             : action)
                         .ToArray(),
                     current.Metadata));
@@ -111,7 +112,12 @@ public static class ResultApplicationPolicy
 
         var actions = current.GameActions
             .Where(action => !string.Equals(action.Name, ManagedActionName, StringComparison.Ordinal))
-            .Append(new GameActionSnapshot(ManagedActionName, result.ExecutablePath, result.WorkingDirectory, DirectGameActionType.File, true))
+            .Append(new GameActionSnapshot(
+                ManagedActionName,
+                result.ExecutablePath,
+                result.WorkingDirectory,
+                DirectGameActionType.File,
+                !current.HasLauncherFeature))
             .ToArray();
 
         return ResultApplicationDecision.Apply(new GameUpdateMutation(true, result.InstallationDirectory, actions, current.Metadata));

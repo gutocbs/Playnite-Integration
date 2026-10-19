@@ -18,6 +18,17 @@ public sealed class ManagedPlayActionPolicyTests
     }
 
     [Fact]
+    public void Evaluate_does_not_mark_a_new_managed_action_as_play_when_a_launcher_feature_exists()
+    {
+        var current = Current() with { HasLauncherFeature = true };
+
+        var decision = ResultApplicationPolicy.Evaluate(current, Result());
+
+        var mutation = Assert.IsType<GameUpdateMutation>(decision.Mutation);
+        Assert.False(Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName).IsPlayAction);
+    }
+
+    [Fact]
     public void Evaluate_corrects_an_existing_managed_action_in_place_during_an_idempotent_retry()
     {
         var result = Result();
@@ -34,6 +45,24 @@ public sealed class ManagedPlayActionPolicyTests
         var mutation = Assert.IsType<GameUpdateMutation>(decision.Mutation);
         Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName && action.IsPlayAction);
         Assert.Equal(unrelated, Assert.Single(mutation.GameActions, action => action.Name == unrelated.Name));
+    }
+
+    [Fact]
+    public void Evaluate_clears_the_managed_play_action_on_retry_when_a_launcher_feature_exists()
+    {
+        var result = Result();
+        var managed = new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, result.ExecutablePath, result.WorkingDirectory, DirectGameActionType.File, true);
+        var current = Current(managed) with
+        {
+            IsInstalled = true,
+            InstallDirectory = result.InstallationDirectory,
+            HasLauncherFeature = true
+        };
+
+        var decision = ResultApplicationPolicy.Evaluate(current, result);
+
+        var mutation = Assert.IsType<GameUpdateMutation>(decision.Mutation);
+        Assert.False(Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName).IsPlayAction);
     }
 
     private static CurrentGameSnapshot Current(params GameActionSnapshot[] actions) => new(

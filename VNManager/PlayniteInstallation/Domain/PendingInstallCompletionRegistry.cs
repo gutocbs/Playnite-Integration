@@ -4,7 +4,7 @@ public sealed class PendingInstallCompletionRegistry
 {
     private readonly Dictionary<Guid, PendingCompletion> pending = new();
 
-    public void Register(Guid requestId, Guid gameId, Action<string> complete) => pending[requestId] = new PendingCompletion(gameId, complete);
+    public void Register(Guid requestId, Guid gameId, Action<string> complete, Action? cancel = null) => pending[requestId] = new PendingCompletion(gameId, complete, cancel);
 
     public void Remove(Guid requestId) => pending.Remove(requestId);
 
@@ -16,5 +16,13 @@ public sealed class PendingInstallCompletionRegistry
         return true;
     }
 
-    private sealed record PendingCompletion(Guid GameId, Action<string> Complete);
+    public bool TryCancel(Guid requestId, Guid gameId)
+    {
+        if (!pending.TryGetValue(requestId, out var pendingCompletion) || pendingCompletion.GameId != gameId) return false;
+        pendingCompletion.Cancel?.Invoke();
+        pending.Remove(requestId);
+        return true;
+    }
+
+    private sealed record PendingCompletion(Guid GameId, Action<string> Complete, Action? Cancel);
 }

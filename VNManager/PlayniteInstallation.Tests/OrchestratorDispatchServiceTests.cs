@@ -25,6 +25,23 @@ public sealed class OrchestratorDispatchServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Persisting_a_request_does_not_activate_until_the_progress_callback_starts_extraction()
+    {
+        var store = new AtomicTransportFileStore(new TransportPaths(root));
+        var launcher = new RecordingLauncher(store);
+        var service = new OrchestratorDispatchService(store, launcher);
+
+        var persisted = service.PersistRequest(Request());
+
+        Assert.True(persisted.RequestPersisted);
+        Assert.False(persisted.OrchestratorActivated);
+        Assert.Equal(0, launcher.ActivationCount);
+        await service.ActivateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, launcher.ActivationCount);
+        Assert.True(launcher.RequestWasPresentWhenActivated);
+    }
+
+    [Fact]
     public void Result_ready_listener_invokes_callback_when_the_named_event_is_signalled()
     {
         var eventName = "Local\\VNOrchestrator.Tests." + Guid.NewGuid().ToString("N");
@@ -77,8 +94,10 @@ public sealed class OrchestratorDispatchServiceTests : IDisposable
     {
         public bool ThrowOnActivate { get; set; }
         public bool RequestWasPresentWhenActivated { get; private set; }
+        public int ActivationCount { get; private set; }
         public Task ActivateAsync(CancellationToken cancellationToken)
         {
+            ActivationCount++;
             RequestWasPresentWhenActivated = Directory.Exists(store.Paths.InboxDirectory) && Directory.GetFiles(store.Paths.InboxDirectory, "*.json").Length == 1;
             if (ThrowOnActivate) throw new InvalidOperationException("not running");
             return Task.CompletedTask;
