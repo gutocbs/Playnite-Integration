@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
@@ -17,9 +16,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Update="Configuration\host.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
         <None Update="Configuration\locale-emulator.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>

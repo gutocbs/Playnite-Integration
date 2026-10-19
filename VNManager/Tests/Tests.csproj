@@ -26,30 +26,17 @@
     <ProjectReference Include="..\TestAssets\ShortLived\ShortLived.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="..\Adapter\Logging.psm1"
-          Link="TestAssets\Adapter\Logging.psm1"
-          CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\Adapter\PlayniteAdapter.ps1"
-          Link="TestAssets\Adapter\PlayniteAdapter.ps1"
-          CopyToOutputDirectory="PreserveNewest" />
-    <None Update="PlayniteAdapterHarness.ps1"
-          CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
   <Target Name="CopyTestExecutables" AfterTargets="Build">
     <ItemGroup>
       <LocaleEmulatorStubFiles Include="..\TestAssets\LocaleEmulatorStub\bin\$(Configuration)\net10.0\*" />
       <PersistentAFiles Include="..\TestAssets\PersistentA\bin\$(Configuration)\net10.0\*" />
       <PersistentBFiles Include="..\TestAssets\PersistentB\bin\$(Configuration)\net10.0\*" />
       <ShortLivedFiles Include="..\TestAssets\ShortLived\bin\$(Configuration)\net10.0\*" />
-      <HostFiles Include="..\Host\bin\$(Configuration)\net10.0\*" />
     </ItemGroup>
     <Copy SourceFiles="@(LocaleEmulatorStubFiles)" DestinationFolder="$(OutDir)TestAssets\LocaleEmulatorStub" />
     <Copy SourceFiles="@(PersistentAFiles)" DestinationFolder="$(OutDir)TestAssets\PersistentA" />
     <Copy SourceFiles="@(PersistentBFiles)" DestinationFolder="$(OutDir)TestAssets\PersistentB" />
     <Copy SourceFiles="@(ShortLivedFiles)" DestinationFolder="$(OutDir)TestAssets\ShortLived" />
-    <Copy SourceFiles="@(HostFiles)" DestinationFolder="$(OutDir)TestAssets\Host" />
   </Target>
 
 </Project>
