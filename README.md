@@ -105,6 +105,14 @@ dotnet build .\VNManager\PlaynitePlugin\PlaynitePlugin.csproj -c Release
 
 Copy the resulting plugin build output, including its dependency files and `extension.yaml`, to the Playnite extensions directory. Deploy the complete output set together; copying a single DLL is not supported.
 
+To build and deploy over an installed copy in one step (close Playnite first):
+
+```powershell
+.\scripts\Publish-Extension.ps1          # add -WhatIf to preview
+```
+
+The script backs up `%APPDATA%\Playnite\Extensions\VNManager` and the plugin data folder (`%APPDATA%\Playnite\ExtensionsData\0e1b3f2c-56f4-4eaf-bb7b-7f2c02aa5c5a`, where the plugin starts `LauncherSupervisor.exe` from) to `%APPDATA%\Playnite\VNManager-backups\<timestamp>`, then copies the new files over both. It never deletes files and never overwrites an existing `Configuration\*.json`.
+
 ## Process monitoring and cleanup
 
 `process-management.json` determines which processes may be observed and which resources may be cleaned up. `monitorProcesses` are checked during the configured `preferredProcessDetectionWindowSeconds` before accepting the requested executable. This lets Playnite-Integration track a real engine started by a short-lived launcher.
