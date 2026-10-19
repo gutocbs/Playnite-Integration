@@ -84,10 +84,7 @@ public sealed class AppLogger : IAppLogger
             _ => value.ToString()
         } ?? string.Empty;
 
-        return text
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\r", "\\r", StringComparison.Ordinal)
-            .Replace("\n", "\\n", StringComparison.Ordinal)
+        return EscapeLineBreaks(text.Replace("\\", "\\\\", StringComparison.Ordinal))
             .Replace(";", "\\;", StringComparison.Ordinal);
     }
 
@@ -119,7 +116,7 @@ public sealed class AppLogger : IAppLogger
     {
         try
         {
-            var directory = Path.GetDirectoryName(_logPath) ?? AppContext.BaseDirectory;
+            var directory = Path.GetDirectoryName(_logPath)!;
             var baseName = Path.GetFileNameWithoutExtension(_logPath);
             var extension = Path.GetExtension(_logPath);
             var fallbackPath = Path.Combine(

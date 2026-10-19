@@ -14,20 +14,21 @@ public static class HostComposition
         ArgumentException.ThrowIfNullOrWhiteSpace(configurationDirectory);
         ArgumentException.ThrowIfNullOrWhiteSpace(logPath);
 
-        var configurationPath = Path.Combine(
-            configurationDirectory,
-            "locale-emulator.json");
-        var processManagementConfigurationPath = Path.Combine(
-            configurationDirectory,
-            "process-management.json");
-        var noRegionLoaderConfigurationPath = Path.Combine(
-            configurationDirectory,
-            "no-region-loader.json");
-        var options = LocaleEmulatorOptionsLoader.Load(configurationPath);
+        var localeEmulatorOptions = LocaleEmulatorOptionsLoader.Load(
+            Path.Combine(configurationDirectory, "locale-emulator.json"));
         var noRegionLoaderOptions = NoRegionLoaderOptionsLoader.Load(
-            noRegionLoaderConfigurationPath);
+            Path.Combine(configurationDirectory, "no-region-loader.json"));
         var processManagementOptions = ProcessManagementOptionsLoader.Load(
-            processManagementConfigurationPath);
+            Path.Combine(configurationDirectory, "process-management.json"));
+
+        (IAppLogger Logger, ProcessMonitor Monitor, ProcessCleanup Cleanup) CreateSupervision(string executionId)
+        {
+            IAppLogger logger = new AppLogger(executionId, logPath);
+            return (
+                logger,
+                new ProcessMonitor(processManagementOptions, logger),
+                new ProcessCleanup(processManagementOptions, logger));
+        }
 
         return new LauncherRegistry(
         [
@@ -35,27 +36,25 @@ public static class HostComposition
                 "Locale Emulator",
                 executionId =>
                 {
-                    IAppLogger logger = new AppLogger(executionId, logPath);
-
+                    var supervision = CreateSupervision(executionId);
                     return new LocaleEmulatorLauncher(
-                        options,
+                        localeEmulatorOptions,
                         new LocaleEmulatorProcessStarter(),
-                        new ProcessMonitor(processManagementOptions, logger),
-                        new ProcessCleanup(processManagementOptions, logger),
-                        logger);
+                        supervision.Monitor,
+                        supervision.Cleanup,
+                        supervision.Logger);
                 }),
             new LauncherRegistration(
                 "NoRegionLoader",
                 executionId =>
                 {
-                    IAppLogger logger = new AppLogger(executionId, logPath);
-
+                    var supervision = CreateSupervision(executionId);
                     return new NoRegionLoaderLauncher(
                         noRegionLoaderOptions,
                         new NoRegionLoaderProcessStarter(),
-                        new ProcessMonitor(processManagementOptions, logger),
-                        new ProcessCleanup(processManagementOptions, logger),
-                        logger);
+                        supervision.Monitor,
+                        supervision.Cleanup,
+                        supervision.Logger);
                 })
         ]);
     }
