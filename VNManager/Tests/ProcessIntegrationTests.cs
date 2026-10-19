@@ -149,18 +149,25 @@ public sealed class ProcessIntegrationTests
     }
 
     [Fact]
-    public async Task ProcessCleanup_AcceptsLegacyNullServiceStopperWhenNoServicesAreConfigured()
+    public async Task ProcessMonitor_ExecutableTimeoutOverridesGlobalTimeout()
     {
-        var cleanup = new ProcessCleanup(
-            new ProcessManagementOptions(),
-            new NullLogger(),
-            null);
+        var processName = $"VnMissing{Guid.NewGuid():N}";
+        var monitor = new ProcessMonitor(
+            new ProcessManagementOptions
+            {
+                GlobalTimeout = 10,
+                Executables = [new ExecutableCleanupOptions { Name = $"{processName}.exe", Timeout = 1 }]
+            },
+            new NullLogger());
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-        var result = await cleanup.TerminateForMonitoredProcessAsync(
-            "VnTestShort.exe",
-            TestContext.Current.CancellationToken);
+        var exception = await Assert.ThrowsAsync<ProcessStartTimeoutException>(() =>
+            monitor.WaitForStartAndExitAsync(
+                $"{processName}.exe",
+                TimeSpan.FromMilliseconds(25),
+                timeout.Token));
 
-        Assert.Empty(result.Failures);
+        Assert.Contains($"{processName} (1s)", exception.Message);
     }
 
     [Fact]

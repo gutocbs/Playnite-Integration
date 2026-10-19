@@ -30,30 +30,20 @@ public sealed class ProcessMonitor(
         }
 
         var gameProcess = ProcessName.Normalize(gameExecutable);
-        var preferredProcesses = options.MonitorProcesses
+        var preferredNames = options.MonitorProcesses
             .Select(ProcessName.Normalize)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(processName => !string.Equals(
                 processName,
                 gameProcess,
                 StringComparison.OrdinalIgnoreCase))
-            .Select(processName => new MonitoredProcess(
-                processName,
-                ResolveTimeout(processName)))
             .ToArray();
         var configuredProcesses = new[] { gameProcess }
-            .Concat(preferredProcesses.Select(process => process.Name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Concat(preferredNames)
             .Select(processName => new MonitoredProcess(
                 processName,
                 ResolveTimeout(processName)))
             .ToArray();
-
-        if (configuredProcesses.Length == 0)
-        {
-            throw new InvalidOperationException(
-                "At least one process must be configured for monitoring.");
-        }
 
         logger.Write(
             LogLevel.Info,
@@ -64,12 +54,47 @@ public sealed class ProcessMonitor(
                 ["ProcessNames"] = string.Join(",", configuredProcesses.Select(process => process.Name))
             });
 
-        string? processName = null;
+        var processName = await WaitForStartAsync(
+            gameProcess,
+            new HashSet<string>(preferredNames, StringComparer.OrdinalIgnoreCase),
+            configuredProcesses,
+            pollingInterval,
+            cancellationToken);
+
+        logger.Write(
+            LogLevel.Info,
+            "ProcessMonitor",
+            "Target process started",
+            new Dictionary<string, object?> { ["ProcessName"] = processName });
+
+        if (onStarted is not null)
+        {
+            await onStarted(processName, cancellationToken);
+        }
+
+        await WaitWhileRunningAsync(processName, pollingInterval, cancellationToken);
+
+        logger.Write(
+            LogLevel.Info,
+            "ProcessMonitor",
+            "Target process exited",
+            new Dictionary<string, object?> { ["ProcessName"] = processName });
+
+        return processName;
+    }
+
+    private async Task<string> WaitForStartAsync(
+        string gameProcess,
+        IReadOnlySet<string> preferredNames,
+        IReadOnlyList<MonitoredProcess> configuredProcesses,
+        TimeSpan pollingInterval,
+        CancellationToken cancellationToken)
+    {
         var gameProcessWasStarted = false;
         var startedAt = Stopwatch.GetTimestamp();
         var preferredProcessDetectionWindow = TimeSpan.FromSeconds(
             options.PreferredProcessDetectionWindowSeconds);
-        while (processName is null)
+        while (true)
         {
             var elapsed = Stopwatch.GetElapsedTime(startedAt);
             var activeCandidates = configuredProcesses
@@ -78,16 +103,13 @@ public sealed class ProcessMonitor(
 
             // Engine processes are preferred over a short-lived executable
             // used only to bootstrap the actual game.
-            processName = activeCandidates
-                .Where(process => preferredProcesses.Any(preferred => string.Equals(
-                    preferred.Name,
-                    process.Name,
-                    StringComparison.OrdinalIgnoreCase)))
+            var preferredProcess = activeCandidates
                 .Select(process => process.Name)
+                .Where(preferredNames.Contains)
                 .FirstOrDefault(IsRunning);
-            if (processName is not null)
+            if (preferredProcess is not null)
             {
-                break;
+                return preferredProcess;
             }
 
             if (IsRunning(gameProcess))
@@ -96,16 +118,14 @@ public sealed class ProcessMonitor(
 
                 if (elapsed >= preferredProcessDetectionWindow)
                 {
-                    processName = gameProcess;
-                    break;
+                    return gameProcess;
                 }
             }
             else if (gameProcessWasStarted && elapsed >= preferredProcessDetectionWindow)
             {
                 // The bootstrapper already exited and no configured engine
                 // appeared during its detection window.
-                processName = gameProcess;
-                break;
+                return gameProcess;
             }
 
             if (activeCandidates.Length == 0)
@@ -121,39 +141,22 @@ public sealed class ProcessMonitor(
 
             await Task.Delay(pollingInterval, cancellationToken);
         }
+    }
 
-        logger.Write(
-            LogLevel.Info,
-            "ProcessMonitor",
-            "Target process started",
-            new Dictionary<string, object?> { ["ProcessName"] = processName });
-
-        if (onStarted is not null)
-        {
-            await onStarted(processName, cancellationToken);
-        }
-
+    private static async Task WaitWhileRunningAsync(
+        string processName,
+        TimeSpan pollingInterval,
+        CancellationToken cancellationToken)
+    {
         while (IsRunning(processName))
         {
             await Task.Delay(pollingInterval, cancellationToken);
         }
-
-        logger.Write(
-            LogLevel.Info,
-            "ProcessMonitor",
-            "Target process exited",
-            new Dictionary<string, object?> { ["ProcessName"] = processName });
-
-        return processName;
     }
 
     private TimeSpan ResolveTimeout(string processName)
     {
-        var configuredTimeout = options.Executables
-            .Where(executable => string.Equals(
-                ProcessName.Normalize(executable.Name),
-                processName,
-                StringComparison.OrdinalIgnoreCase))
+        var configuredTimeout = ExecutableEntries.For(options, processName)
             .Select(executable => executable.Timeout)
             .FirstOrDefault(timeout => timeout.HasValue);
 
@@ -163,18 +166,13 @@ public sealed class ProcessMonitor(
     private static bool IsRunning(string processName)
     {
         var processes = Process.GetProcessesByName(processName);
+        var isRunning = processes.Length > 0;
+        foreach (var process in processes)
+        {
+            process.Dispose();
+        }
 
-        try
-        {
-            return processes.Length > 0;
-        }
-        finally
-        {
-            foreach (var process in processes)
-            {
-                process.Dispose();
-            }
-        }
+        return isRunning;
     }
 
     private sealed record MonitoredProcess(string Name, TimeSpan Timeout);

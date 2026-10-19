@@ -3,28 +3,15 @@ using Launcher.Logging;
 
 namespace Launcher.ProcessManagement;
 
-public sealed class ProcessCleanup : IProcessCleanup
+public sealed class ProcessCleanup(
+    ProcessManagementOptions options,
+    IAppLogger logger,
+    IServiceStopper? serviceStopper = null) : IProcessCleanup
 {
-    private readonly ProcessManagementOptions options;
-    private readonly IAppLogger logger;
-    private readonly IServiceStopper serviceStopper;
-
-    // Keep this overload so existing launcher binaries can use a newer
-    // ProcessManagement.dll during an incremental extension deployment.
-    public ProcessCleanup(ProcessManagementOptions options, IAppLogger logger)
-        : this(options, logger, new ElevatedServiceStopper())
-    {
-    }
-
-    public ProcessCleanup(
-        ProcessManagementOptions options,
-        IAppLogger logger,
-        IServiceStopper? serviceStopper)
-    {
-        this.options = options ?? throw new ArgumentNullException(nameof(options));
-        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        this.serviceStopper = serviceStopper ?? new ElevatedServiceStopper();
-    }
+    private readonly ProcessManagementOptions _options =
+        options ?? throw new ArgumentNullException(nameof(options));
+    private readonly IAppLogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IServiceStopper _serviceStopper = serviceStopper ?? new ElevatedServiceStopper();
 
     public async Task<ProcessCleanupResult> TerminateForMonitoredProcessAsync(
         string? monitoredExecutableOrProcessName,
@@ -33,8 +20,16 @@ public sealed class ProcessCleanup : IProcessCleanup
         var monitoredProcessName = string.IsNullOrWhiteSpace(monitoredExecutableOrProcessName)
             ? null
             : ProcessName.Normalize(monitoredExecutableOrProcessName);
-        var processNames = BuildProcessCleanupPlan(monitoredProcessName);
-        var serviceNames = BuildServiceCleanupPlan(monitoredProcessName);
+        var processNames = BuildCleanupPlan(
+            _options.GlobalCleanupProcesses,
+            executable => executable.CleanupProcesses,
+            monitoredProcessName,
+            normalize: true);
+        var serviceNames = BuildCleanupPlan(
+            _options.GlobalCleanupServices,
+            executable => executable.CleanupServices,
+            monitoredProcessName,
+            normalize: false);
         var found = 0;
         var terminated = 0;
         var failures = new List<string>();
@@ -54,7 +49,7 @@ public sealed class ProcessCleanup : IProcessCleanup
                     await process.WaitForExitAsync(cancellationToken);
                     terminated++;
 
-                    logger.Write(
+                    _logger.Write(
                         LogLevel.Info,
                         "ProcessCleanup",
                         "Cleanup process terminated",
@@ -69,7 +64,7 @@ public sealed class ProcessCleanup : IProcessCleanup
                     var failure = $"{processName} (PID {process.Id}): {exception.Message}";
                     failures.Add(failure);
 
-                    logger.Write(
+                    _logger.Write(
                         LogLevel.Warning,
                         "ProcessCleanup",
                         "Cleanup process could not be terminated",
@@ -90,11 +85,11 @@ public sealed class ProcessCleanup : IProcessCleanup
         foreach (var serviceName in serviceNames)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var result = await serviceStopper.StopAsync(serviceName, cancellationToken);
+            var result = await _serviceStopper.StopAsync(serviceName, cancellationToken);
 
             if (result.Stopped)
             {
-                logger.Write(
+                _logger.Write(
                     LogLevel.Info,
                     "ProcessCleanup",
                     "Cleanup service stop requested",
@@ -104,7 +99,7 @@ public sealed class ProcessCleanup : IProcessCleanup
 
             var failure = $"service {serviceName}: {result.Failure ?? "unknown failure"}";
             failures.Add(failure);
-            logger.Write(
+            _logger.Write(
                 LogLevel.Warning,
                 "ProcessCleanup",
                 "Cleanup service could not be stopped",
@@ -118,45 +113,25 @@ public sealed class ProcessCleanup : IProcessCleanup
         return new ProcessCleanupResult(found, terminated, failures);
     }
 
-    private IReadOnlyList<string> BuildProcessCleanupPlan(string? monitoredProcessName)
+    private IReadOnlyList<string> BuildCleanupPlan(
+        IReadOnlyList<string>? global,
+        Func<ExecutableCleanupOptions, IReadOnlyList<string>?> specific,
+        string? monitoredProcessName,
+        bool normalize)
     {
-        var specificProcesses = monitoredProcessName is null
+        var specificNames = monitoredProcessName is null
             ? Enumerable.Empty<string>()
-            : options.Executables
-            .Where(executable => string.Equals(
-                ProcessName.Normalize(executable.Name),
-                monitoredProcessName,
-                StringComparison.OrdinalIgnoreCase))
-            .SelectMany(executable => executable.CleanupProcesses ?? [])
-            .ToArray();
+            : ExecutableEntries.For(_options, monitoredProcessName)
+                .SelectMany(executable => specific(executable) ?? [])
+                .ToArray();
 
-        return (options.GlobalCleanupProcesses ?? [])
-            .Concat(specificProcesses)
+        var names = (global ?? [])
+            .Concat(specificNames)
             .SelectMany(name => name.Split(',', StringSplitOptions.RemoveEmptyEntries))
             .Select(name => name.Trim().Trim('"'))
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Select(ProcessName.Normalize)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-    }
+            .Where(name => !string.IsNullOrWhiteSpace(name));
 
-    private IReadOnlyList<string> BuildServiceCleanupPlan(string? monitoredProcessName)
-    {
-        var specificServices = monitoredProcessName is null
-            ? Enumerable.Empty<string>()
-            : options.Executables
-            .Where(executable => string.Equals(
-                ProcessName.Normalize(executable.Name),
-                monitoredProcessName,
-                StringComparison.OrdinalIgnoreCase))
-            .SelectMany(executable => executable.CleanupServices ?? [])
-            .ToArray();
-
-        return (options.GlobalCleanupServices ?? [])
-            .Concat(specificServices)
-            .SelectMany(name => name.Split(',', StringSplitOptions.RemoveEmptyEntries))
-            .Select(name => name.Trim().Trim('"'))
-            .Where(name => !string.IsNullOrWhiteSpace(name))
+        return (normalize ? names.Select(ProcessName.Normalize) : names)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
