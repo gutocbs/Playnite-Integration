@@ -55,3 +55,4 @@ nunit-*.xml
 /.obsidian
 /VNManager/.idea
 .worktrees/
+/plugin

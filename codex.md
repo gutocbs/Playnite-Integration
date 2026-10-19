@@ -40,11 +40,9 @@ The Adapter/Host boundary uses per-execution JSON files and a named Windows canc
 - Process cleanup may terminate only explicitly configured processes. Cancellation must not terminate the game.
 - Run the canonical test command: `dotnet run --project VNManager/Tests/Tests.csproj`. Persistent `VnTest*` integration fixtures must always be cleaned up.
 
-For global engineering conventions, code patterns, architectural standards, and organizational guidance, consult `.codex/rules/company.md`.
 
 ## Instructions for AI Assistants
 
-- Always follow the conventions defined in `.codex/rules/company.md`.
 - Do not alter external contracts without validation.
 - Respect the existing architecture and dependency direction.
 - Prioritize consistency with the current code.
