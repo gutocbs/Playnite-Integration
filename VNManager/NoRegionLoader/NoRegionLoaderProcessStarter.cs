@@ -7,6 +7,14 @@ public sealed class NoRegionLoaderProcessStarter : INoRegionLoaderProcessStarter
 {
     public INoRegionLoaderProcess Start(NoRegionLoaderOptions options, LaunchRequest request)
     {
+        var process = Process.Start(CreateStartInfo(options, request)) ?? throw new InvalidOperationException(
+            "NoRegionLoader did not return a process instance.");
+
+        return new LaunchedProcess(process);
+    }
+
+    public static ProcessStartInfo CreateStartInfo(NoRegionLoaderOptions options, LaunchRequest request)
+    {
         var startInfo = new ProcessStartInfo
         {
             FileName = options.NoRegionLoaderExecutable,
@@ -22,10 +30,7 @@ public sealed class NoRegionLoaderProcessStarter : INoRegionLoaderProcessStarter
             startInfo.ArgumentList.Add(argument);
         }
 
-        var process = Process.Start(startInfo) ?? throw new InvalidOperationException(
-            "NoRegionLoader did not return a process instance.");
-
-        return new LaunchedProcess(process);
+        return startInfo;
     }
 
     private sealed class LaunchedProcess(Process process) : INoRegionLoaderProcess

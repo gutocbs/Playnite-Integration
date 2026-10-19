@@ -7,6 +7,14 @@ public sealed class LocaleEmulatorProcessStarter : ILocaleEmulatorProcessStarter
 {
     public ILaunchedProcess Start(LocaleEmulatorOptions options, LaunchRequest request)
     {
+        var process = Process.Start(CreateStartInfo(options, request)) ?? throw new InvalidOperationException(
+            "Locale Emulator did not return a process instance.");
+
+        return new LaunchedProcess(process);
+    }
+
+    public static ProcessStartInfo CreateStartInfo(LocaleEmulatorOptions options, LaunchRequest request)
+    {
         var startInfo = new ProcessStartInfo
         {
             FileName = options.LocaleEmulatorExecutable,
@@ -22,10 +30,7 @@ public sealed class LocaleEmulatorProcessStarter : ILocaleEmulatorProcessStarter
             startInfo.ArgumentList.Add(argument);
         }
 
-        var process = Process.Start(startInfo) ?? throw new InvalidOperationException(
-            "Locale Emulator did not return a process instance.");
-
-        return new LaunchedProcess(process);
+        return startInfo;
     }
 
     private sealed class LaunchedProcess(Process process) : ILaunchedProcess
