@@ -1,17 +1,13 @@
 using System.Diagnostics;
 using Launcher.Abstractions;
+using Launcher.Supervision;
 
 namespace Launcher.LocaleEmulator;
 
 public sealed class LocaleEmulatorProcessStarter : ILocaleEmulatorProcessStarter
 {
-    public ILaunchedProcess Start(LocaleEmulatorOptions options, LaunchRequest request)
-    {
-        var process = Process.Start(CreateStartInfo(options, request)) ?? throw new InvalidOperationException(
-            "Locale Emulator did not return a process instance.");
-
-        return new LaunchedProcess(process);
-    }
+    public ILaunchedProcess Start(LocaleEmulatorOptions options, LaunchRequest request) =>
+        ToolProcess.Start(CreateStartInfo(options, request), "Locale Emulator");
 
     public static ProcessStartInfo CreateStartInfo(LocaleEmulatorOptions options, LaunchRequest request)
     {
@@ -31,12 +27,5 @@ public sealed class LocaleEmulatorProcessStarter : ILocaleEmulatorProcessStarter
         }
 
         return startInfo;
-    }
-
-    private sealed class LaunchedProcess(Process process) : ILaunchedProcess
-    {
-        public int Id => process.Id;
-
-        public void Dispose() => process.Dispose();
     }
 }

@@ -1,17 +1,13 @@
 using System.Diagnostics;
 using Launcher.Abstractions;
+using Launcher.Supervision;
 
 namespace Launcher.NoRegionLoader;
 
 public sealed class NoRegionLoaderProcessStarter : INoRegionLoaderProcessStarter
 {
-    public INoRegionLoaderProcess Start(NoRegionLoaderOptions options, LaunchRequest request)
-    {
-        var process = Process.Start(CreateStartInfo(options, request)) ?? throw new InvalidOperationException(
-            "NoRegionLoader did not return a process instance.");
-
-        return new LaunchedProcess(process);
-    }
+    public ILaunchedProcess Start(NoRegionLoaderOptions options, LaunchRequest request) =>
+        ToolProcess.Start(CreateStartInfo(options, request), "NoRegionLoader");
 
     public static ProcessStartInfo CreateStartInfo(NoRegionLoaderOptions options, LaunchRequest request)
     {
@@ -31,12 +27,5 @@ public sealed class NoRegionLoaderProcessStarter : INoRegionLoaderProcessStarter
         }
 
         return startInfo;
-    }
-
-    private sealed class LaunchedProcess(Process process) : INoRegionLoaderProcess
-    {
-        public int Id => process.Id;
-
-        public void Dispose() => process.Dispose();
     }
 }

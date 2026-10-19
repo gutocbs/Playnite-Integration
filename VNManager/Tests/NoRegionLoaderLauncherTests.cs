@@ -1,6 +1,7 @@
 using Launcher.Abstractions;
 using Launcher.NoRegionLoader;
 using Launcher.ProcessManagement;
+using Launcher.Supervision;
 
 namespace Launcher.Tests;
 
@@ -71,6 +72,34 @@ public sealed class NoRegionLoaderLauncherTests
         Assert.Equal("PROCESS_START_TIMEOUT", result.Error?.Code);
     }
 
+    [Fact]
+    public async Task LaunchAsync_WhenMonitoringIsCancelled_ReturnsFailureAndRunsCleanup()
+    {
+        using var files = new TemporaryFiles();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var monitor = new FakeProcessMonitor
+        {
+            Behavior = token => Task.FromException<string>(new OperationCanceledException(token))
+        };
+        var cleanup = new FakeProcessCleanup();
+        var launcher = new NoRegionLoaderLauncher(
+            CreateOptions(files.CreateFile("NoRegion Loader.exe")),
+            new FakeNoRegionLoaderProcessStarter(),
+            monitor,
+            cleanup,
+            new NullLogger());
+
+        var result = await launcher.LaunchAsync(
+            new LaunchRequest("execution-id", files.CreateFile("game.exe"), []),
+            cancellation.Token);
+
+        Assert.False(result.Success);
+        Assert.Equal("LAUNCH_CANCELLED", result.Error?.Code);
+        Assert.Equal("NoRegionLoader process supervision was cancelled.", result.Error?.Message);
+        Assert.Null(cleanup.MonitoredProcessName);
+    }
+
     private static NoRegionLoaderOptions CreateOptions(string executable) => new()
     {
         NoRegionLoaderExecutable = executable,
@@ -81,19 +110,10 @@ public sealed class NoRegionLoaderLauncherTests
     {
         public LaunchRequest? Request { get; private set; }
 
-        public INoRegionLoaderProcess Start(NoRegionLoaderOptions options, LaunchRequest request)
+        public ILaunchedProcess Start(NoRegionLoaderOptions options, LaunchRequest request)
         {
             Request = request;
-            return new FakeProcess();
-        }
-    }
-
-    private sealed class FakeProcess : INoRegionLoaderProcess
-    {
-        public int Id => 64;
-
-        public void Dispose()
-        {
+            return new FakeLaunchedProcess(64);
         }
     }
 }

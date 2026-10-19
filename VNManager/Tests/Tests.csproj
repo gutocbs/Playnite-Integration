@@ -20,6 +20,7 @@
     <ProjectReference Include="..\NoRegionLoader\NoRegionLoader.csproj" />
     <ProjectReference Include="..\Logging\Logging.csproj" />
     <ProjectReference Include="..\ProcessManagement\ProcessManagement.csproj" />
+    <ProjectReference Include="..\Supervision\Supervision.csproj" />
     <ProjectReference Include="..\TestAssets\LocaleEmulatorStub\LocaleEmulatorStub.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\TestAssets\PersistentA\PersistentA.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\TestAssets\PersistentB\PersistentB.csproj" ReferenceOutputAssembly="false" />

@@ -1,4 +1,5 @@
 using Launcher.Abstractions;
+using Launcher.Supervision;
 
 namespace Launcher.LocaleEmulator;
 

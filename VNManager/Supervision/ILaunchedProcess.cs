@@ -1,4 +1,4 @@
-namespace Launcher.LocaleEmulator;
+namespace Launcher.Supervision;
 
 public interface ILaunchedProcess : IDisposable
 {

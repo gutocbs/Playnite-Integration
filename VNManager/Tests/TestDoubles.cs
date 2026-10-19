@@ -2,6 +2,7 @@ using Launcher.Abstractions;
 using Launcher.LocaleEmulator;
 using Launcher.Logging;
 using Launcher.ProcessManagement;
+using Launcher.Supervision;
 
 namespace Launcher.Tests;
 
@@ -26,16 +27,16 @@ internal sealed class FakeProcessStarter : ILocaleEmulatorProcessStarter
     {
         Options = options;
         Request = request;
-        return new FakeLaunchedProcess();
+        return new FakeLaunchedProcess(42);
     }
+}
 
-    private sealed class FakeLaunchedProcess : ILaunchedProcess
+internal sealed class FakeLaunchedProcess(int id) : ILaunchedProcess
+{
+    public int Id => id;
+
+    public void Dispose()
     {
-        public int Id => 42;
-
-        public void Dispose()
-        {
-        }
     }
 }
 
