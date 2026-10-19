@@ -32,6 +32,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PlayniteInstallation.Tests"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Supervision", "Supervision\Supervision.csproj", "{7D790D48-1422-42CE-B655-F811BDE85043}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PlaynitePlugin.Tests", "PlaynitePlugin.Tests\PlaynitePlugin.Tests.csproj", "{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -234,6 +236,18 @@ Global
 		{7D790D48-1422-42CE-B655-F811BDE85043}.Release|x64.Build.0 = Release|Any CPU
 		{7D790D48-1422-42CE-B655-F811BDE85043}.Release|x86.ActiveCfg = Release|Any CPU
 		{7D790D48-1422-42CE-B655-F811BDE85043}.Release|x86.Build.0 = Release|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Debug|x64.Build.0 = Debug|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Debug|x86.Build.0 = Debug|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Release|x64.ActiveCfg = Release|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Release|x64.Build.0 = Release|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Release|x86.ActiveCfg = Release|Any CPU
+		{291B1B50-54C1-42F6-A7A9-A3AC264EF8D1}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
