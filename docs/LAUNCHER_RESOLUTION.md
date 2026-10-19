@@ -2,16 +2,13 @@
 
 ## Purpose
 
-This document defines how `Launcher-Host` resolves the logical launcher name
-received in a `DispatcherRequest` into a registered .NET `ILauncher`
-implementation.
-
-The original filesystem-based discovery of PowerShell scripts is legacy and is
-not part of the current Host architecture.
+This document defines how `LauncherRegistry` (Host composition library) resolves
+the logical launcher name received by `LauncherSupervisor` (`--launcher`) into a
+registered .NET `ILauncher` implementation.
 
 ## Responsibilities
 
-The Playnite Adapter selects the logical launcher name from frontend metadata.
+The PlaynitePlugin selects the logical launcher name from frontend metadata.
 It does not resolve .NET types or implementation locations.
 
 The Host is responsible for:
@@ -37,8 +34,7 @@ The value is an identifier. It is not a filesystem path, URI, assembly name or
 
 ## Registration model
 
-For the initial implementation, available Launchers are explicitly registered
-in `Launcher-Host`.
+Available launchers are explicitly registered in `HostComposition`.
 
 Conceptually:
 
@@ -48,9 +44,9 @@ Conceptually:
 LocaleEmulatorLauncher : ILauncher
 ```
 
-Adding a Launcher currently requires adding its Class Library reference and its
+Adding a launcher requires adding its class library reference and its
 registration to the Host. Dynamic assembly discovery, reflection-based loading
-and external plugin directories are outside the initial scope.
+and external plugin directories are out of scope.
 
 ## Case sensitivity
 
@@ -62,7 +58,7 @@ locale emulator
 LOCALE EMULATOR
 ```
 
-The Host preserves the value originally supplied by the Adapter for logs and
+The Host preserves the value originally supplied by the frontend for logs and
 error reporting.
 
 ## Invalid launcher names
@@ -99,8 +95,7 @@ Launcher.
 
 ## Resolution failures
 
-The Host returns a structured error for resolution failures. Initial categories
-may include:
+The Host raises `LauncherResolutionException` with one of these codes:
 
 ```text
 INVALID_LAUNCHER_NAME
@@ -108,13 +103,7 @@ LAUNCHER_NOT_FOUND
 AMBIGUOUS_LAUNCHER
 ```
 
-The final error-code naming convention belongs to the .NET contract and may be
-refined when the contracts are implemented.
-
 ## Design principle
 
-Launcher names are stable logical identifiers. The Adapter requests a launcher;
+Launcher names are stable logical identifiers. The frontend requests a launcher;
 the Host owns the mapping to an in-process `ILauncher` implementation.
-
-Filesystem details from the legacy PowerShell implementation do not cross the
-current Dispatcher contract.

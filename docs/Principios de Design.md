@@ -4,37 +4,40 @@
 
 O Host não deve conter comportamento específico de um Launcher.
 
-Adicionar um Launcher na arquitetura .NET atual exige:
+Adicionar um Launcher exige:
 
 1. Criar uma nova Class Library.
-2. Referenciar `Launcher-Abstractions`.
+2. Referenciar `Abstractions` e, para o ciclo comum de ferramenta externa,
+   `Launcher.Supervision`.
 3. Implementar `ILauncher`.
-4. Registrar a implementação no `Launcher-Host`.
+4. Registrar a implementação no `HostComposition`.
+
+Cada Launcher continua sendo um projeto separado; o que é comum entre eles fica em
+`Launcher.Supervision`, sem fundir as implementações.
 
 Descoberta dinâmica, reflection e infraestrutura de plugins não fazem parte do
-escopo inicial.
+escopo.
 
 ## Independência do Playnite
 
-Somente o Adapter PowerShell deve depender das APIs do Playnite.
+Somente o projeto `PlaynitePlugin` deve depender das APIs do Playnite.
 
-O Host e os Launchers recebem contratos internos e não conhecem Features,
+O supervisor, o Host e os Launchers recebem contratos internos e não conhecem Features,
 objetos ou APIs do frontend. Isso permite reutilizar o sistema com outros
 frontends no futuro.
 
-## Separação de runtimes
+## Separação de processos
 
-PowerShell integra o sistema com o ambiente. .NET implementa a lógica da
-aplicação, incluindo validação, resolução, dispatch e ciclo de vida dos
-Launchers.
-
-Launchers PowerShell existentes são considerados legado durante a migração.
+O plugin roda dentro do Playnite (.NET Framework 4.6.2). A lógica de launch roda
+em um processo separado, o `LauncherSupervisor` (.NET 10), que o Playnite
+acompanha para medir o tempo de jogo.
 
 ## Contratos estáveis
 
-O Adapter envia um `DispatcherRequest` ao Host. Após validar e normalizar a
-entrada, o Host envia um `LaunchRequest` ao `ILauncher` selecionado. O resultado
-é representado por `LaunchResult`, com `Success`, `Data` e `Error`.
+O plugin chama o `LauncherSupervisor` com `--executable`, `--launcher` e os
+argumentos do jogo. O supervisor envia um `LaunchRequest` ao `ILauncher`
+selecionado. O resultado é representado por `LaunchResult`, com `Success`,
+`Data` e `Error`.
 
 Mudanças futuras devem preferir a adição compatível de campos aos contratos.
 
@@ -55,6 +58,7 @@ responsabilidade. Em particular, listas de processos monitorados e processos de
 cleanup pertencem ao módulo de gerenciamento de processos, não às opções de um
 Launcher concreto.
 
-Da mesma forma, o Adapter deve utilizar a API do frontend para expandir suas
-variáveis. Reimplementar no Adapter a lista ou a semântica de variáveis do
-Playnite criaria uma segunda fonte de verdade e não é permitido.
+Da mesma forma, o plugin deve utilizar a API do frontend
+(`ExpandGameVariables`) para expandir suas variáveis. Reimplementar a lista ou a
+semântica de variáveis do Playnite criaria uma segunda fonte de verdade e não é
+permitido.

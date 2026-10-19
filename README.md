@@ -12,27 +12,27 @@ It is intended for games that need a launcher such as **Locale Emulator** or **N
 - Prefers configured engine processes during a short detection window, so a bootstrapper exiting early does not end the session.
 - Uses JSON configuration for tool paths, profiles, process detection, timeouts, and cleanup.
 - Supports graceful cancellation without terminating the game; only explicitly configured cleanup processes or services can be stopped.
-- Writes structured logs and returns structured launch results across the PowerShell/.NET process boundary.
+- Writes structured logs and returns structured launch results.
 
 ## Architecture
 
 ```text
 Playnite
-  -> PowerShell Adapter or Playnite plugin
-  -> Launcher Supervisor / Host (.NET)
-  -> registered launcher
+  -> Playnite plugin (dynamic Play Action)
+  -> LauncherSupervisor.exe (.NET)
+  -> registered launcher (Launcher.Supervision + ProcessManagement)
   -> Locale Emulator or NoRegionLoader
   -> game process
 ```
 
-The adapter turns Playnite metadata into a `DispatcherRequest`. The Host validates the request, resolves an explicitly registered launcher, and returns a `LaunchResult` through per-execution JSON files. The PowerShell adapter and Host communicate cancellation through a named Windows event.
+The plugin reads the game's `[Launcher]` Feature and File action and starts `LauncherSupervisor.exe --executable <game> --launcher <name> [-- <arguments>]`. The supervisor resolves an explicitly registered launcher, supervises the game until it exits and returns exit code `0` or `1`. Playnite tracks playtime for the supervisor's lifetime.
 
-Playnite APIs are isolated to the integration boundary. Launcher projects do not depend on Playnite or PowerShell.
+Playnite APIs are isolated to the plugin. The supervisor and launcher projects do not depend on Playnite.
 
 ## Requirements
 
 - Windows
-- [.NET SDK 10](https://dotnet.microsoft.com/download) for the Host, launchers, supervisor, and tests
+- [.NET SDK 10](https://dotnet.microsoft.com/download) for the supervisor, launchers, and tests
 - Playnite 6.x to use the plugin (`PlayniteSDK` 6.16.0)
 - Locale Emulator and/or NoRegionLoader when using those launch strategies
 
@@ -46,11 +46,11 @@ cd "Playnite Integration"
 dotnet build .\VNManager\Launcher.sln
 ```
 
-Update the configuration copied beside the Host executable before launching a game:
+Update the configuration copied beside `LauncherSupervisor.exe` before launching a game:
 
-- `VNManager/Host/Configuration/locale-emulator.json` — Locale Emulator executable and profile.
-- `VNManager/Host/Configuration/no-region-loader.json` — absolute path to `NoRegion Loader.exe`.
-- `VNManager/ProcessManagement/process-management.json` — monitored executables, start timeouts, and cleanup rules.
+- `VNManager/LauncherSupervisor/Configuration/locale-emulator.json` — Locale Emulator executable and profile.
+- `VNManager/LauncherSupervisor/Configuration/no-region-loader.json` — absolute path to `NoRegion Loader.exe`.
+- `VNManager/LauncherSupervisor/Configuration/process-management.json` — monitored executables, start timeouts, and cleanup rules.
 
 The checked-in tool paths are examples. Do not commit local installation paths or game-specific configuration.
 
@@ -92,7 +92,7 @@ or:
 [Launcher] NoRegionLoader
 ```
 
-The name after `[Launcher]` is a logical launcher identifier, not a file path. Available identifiers are registered by the Host and are matched case-insensitively.
+The name after `[Launcher]` is a logical launcher identifier, not a file path. Available identifiers are registered in `HostComposition` and are matched case-insensitively.
 
 ### Build the Playnite plugin
 
@@ -125,32 +125,39 @@ The solution is at `VNManager/Launcher.sln`.
 # Build every project
 dotnet build .\VNManager\Launcher.sln
 
-# Run the canonical test suite
+# Run the test suites
 dotnet run --project .\VNManager\Tests\Tests.csproj
+dotnet run --project .\VNManager\PlaynitePlugin.Tests\PlaynitePlugin.Tests.csproj
+dotnet run --project .\VNManager\PlayniteInstallation.Tests\PlayniteInstallation.Tests.csproj
 ```
 
-The test suite includes Windows process-integration fixtures. It cleans up its `VnTest*` helper processes, but do not interrupt it midway unless necessary.
+The `Tests` suite includes Windows process-integration fixtures. It cleans up its `VnTest*` helper processes, but do not interrupt it midway unless necessary.
 
 ## Repository layout
 
 ```text
 VNManager/
-  Abstractions/        Shared request, result, error, and launcher contracts
-  Adapter/             PowerShell boundary for Playnite
-  Host/                Request validation, launcher resolution, transport, and exit codes
-  LauncherSupervisor/  Standalone executable used by the plugin
-  LocaleEmulator/      Locale Emulator launcher
-  NoRegionLoader/      NoRegionLoader launcher
-  ProcessManagement/   Monitoring and explicit cleanup
-  PlaynitePlugin/      Optional Playnite 6 generic plugin
-  Tests/               xUnit tests and integration coverage
-docs/                  Architecture, protocol, design decisions, and launcher scope
+  Abstractions/                Shared request, result, error codes, and launcher contracts
+  Host/                        Composition library: configuration loading and launcher registry
+  LauncherSupervisor/          Executable started by the plugin, with Configuration/*.json
+  Supervision/                 Launcher.Supervision: lifecycle shared by tool-based launchers
+  LocaleEmulator/              Locale Emulator launcher
+  NoRegionLoader/              NoRegionLoader launcher
+  ProcessManagement/           Monitoring and explicit cleanup
+  Logging/                     Structured text logging
+  PlaynitePlugin/              Playnite 6 generic plugin (launch and install workflow)
+  PlayniteInstallation/        Install-workflow rules and transport (VN Orchestrator)
+  Tests/                       xUnit tests and process integration coverage
+  TestAssets/                  VnTest* process fixtures
+  PlaynitePlugin.Tests/        Plugin play-action tests
+  PlayniteInstallation.Tests/  Install-workflow tests
+docs/                          Architecture, contracts, design decisions, and launcher scope
 ```
 
 ## Further documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
-- [Adapter–Host protocol](docs/ADAPTER_HOST_PROTOCOL.md)
+- [Launcher resolution](docs/LAUNCHER_RESOLUTION.md)
 - [Launcher scope](docs/LAUNCHER_SCOPE.md)
 - [Launcher contract](docs/Launcher%20Contract.md)
 - [Design decisions](docs/DECISIONS.md)
