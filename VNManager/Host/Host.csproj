@@ -15,17 +15,4 @@
         <ProjectReference Include="..\ProcessManagement\ProcessManagement.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-        <None Update="Configuration\locale-emulator.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-        <None Update="Configuration\no-region-loader.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-        <None Include="..\ProcessManagement\process-management.json"
-              Link="Configuration\process-management.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-    </ItemGroup>
-
 </Project>
