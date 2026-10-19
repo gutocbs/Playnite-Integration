@@ -56,3 +56,4 @@ nunit-*.xml
 /VNManager/.idea
 .worktrees/
 /plugin
+*.DotSettings.user

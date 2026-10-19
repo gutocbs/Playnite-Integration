@@ -9,12 +9,5 @@
   "globalCleanupServices": [
     "UCManSvc"
   ],
-  "executables": [
-    {
-      "name": "rugp.exe",
-      "timeout": 120,
-      "cleanupProcesses": [],
-      "cleanupServices": []
-    }
-  ]
+  "executables": []
 }
