@@ -63,6 +63,8 @@ internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFil
                         game.IsInstalled = mutation.IsInstalled;
                         game.InstallDirectory = mutation.InstallDirectory;
                         game.GameActions ??= new ObservableCollection<GameAction>();
+                        var managedMutation = mutation.GameActions.Single(action =>
+                            action.Name == ResultApplicationPolicy.ManagedActionName);
                         var managed = game.GameActions.SingleOrDefault(action => action.Name == ResultApplicationPolicy.ManagedActionName);
                         if (managed is null)
                         {
@@ -72,7 +74,7 @@ internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFil
                         managed.Type = GameActionType.File;
                         managed.Path = result.ExecutablePath;
                         managed.WorkingDir = result.WorkingDirectory;
-                        managed.IsPlayAction = true;
+                        managed.IsPlayAction = managedMutation.IsPlayAction;
                         api.Database.Games.Update(game);
                     },
                     () => store.WriteAcknowledgement(new PlayniteAcknowledgement(
@@ -102,5 +104,6 @@ internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFil
     private static CurrentGameSnapshot Snapshot(Game game, InstalledGameResult result) => new(
         game.Id, game.IsInstalled, game.InstallDirectory, result.RequestId, result.SourceFingerprint,
         game.GameActions?.Select(action => new GameActionSnapshot(action.Name, action.Path, action.WorkingDir, DirectGameActionType.File, action.IsPlayAction)).ToArray() ?? Array.Empty<GameActionSnapshot>(),
-        new Dictionary<string, string>());
+        new Dictionary<string, string>(),
+        game.Features?.Any(feature => feature?.Name?.StartsWith("[Launcher]", StringComparison.OrdinalIgnoreCase) == true) == true);
 }
