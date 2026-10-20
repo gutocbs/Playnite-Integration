@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <_VNInstallationProtocolCanonicalSource>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Playnite VN Protocol\artifacts\packages'))</_VNInstallationProtocolCanonicalSource>
+    <_VNInstallationProtocolWorktreeSource>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\Playnite VN Protocol\artifacts\packages'))</_VNInstallationProtocolWorktreeSource>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="Exists('$(_VNInstallationProtocolCanonicalSource)')">
+    <VNInstallationProtocolPackageSource>$(_VNInstallationProtocolCanonicalSource)</VNInstallationProtocolPackageSource>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(VNInstallationProtocolPackageSource)' == '' and Exists('$(_VNInstallationProtocolWorktreeSource)')">
+    <VNInstallationProtocolPackageSource>$(_VNInstallationProtocolWorktreeSource)</VNInstallationProtocolPackageSource>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(VNInstallationProtocolPackageSource)' != ''">
+    <RestoreAdditionalProjectSources>$(VNInstallationProtocolPackageSource);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>
+  </PropertyGroup>
+</Project>
