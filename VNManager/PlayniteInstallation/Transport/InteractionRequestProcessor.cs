@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using VNInstallation.Protocol.Contracts;
 using VNInstallation.Protocol.Serialization;
 using VNInstallation.Protocol.Transport;

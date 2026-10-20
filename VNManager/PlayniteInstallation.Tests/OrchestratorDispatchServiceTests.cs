@@ -9,17 +9,17 @@ public sealed class OrchestratorDispatchServiceTests : IDisposable
     private readonly string root = Path.Combine(Path.GetTempPath(), "PlayniteInstallationTests", Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task DispatchAsync_writes_before_activating_and_returns_when_activation_fails()
+    public async Task Activation_failure_is_returned_after_the_request_was_persisted()
     {
         var store = new AtomicTransportFileStore(new TransportPaths(root));
         var launcher = new RecordingLauncher(store);
         launcher.ThrowOnActivate = true;
         var service = new OrchestratorDispatchService(store, launcher);
 
-        var result = await service.DispatchAsync(Request(), TestContext.Current.CancellationToken);
+        service.PersistRequest(Request());
+        var result = await service.ActivateAsync(TestContext.Current.CancellationToken);
 
         Assert.True(launcher.RequestWasPresentWhenActivated);
-        Assert.True(result.RequestPersisted);
         Assert.False(result.OrchestratorActivated);
         Assert.NotNull(result.ActivationError);
     }
@@ -31,10 +31,8 @@ public sealed class OrchestratorDispatchServiceTests : IDisposable
         var launcher = new RecordingLauncher(store);
         var service = new OrchestratorDispatchService(store, launcher);
 
-        var persisted = service.PersistRequest(Request());
+        service.PersistRequest(Request());
 
-        Assert.True(persisted.RequestPersisted);
-        Assert.False(persisted.OrchestratorActivated);
         Assert.Equal(0, launcher.ActivationCount);
         await service.ActivateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, launcher.ActivationCount);
@@ -55,12 +53,12 @@ public sealed class OrchestratorDispatchServiceTests : IDisposable
     }
 
     [Fact]
-    public void Result_ready_synchronization_queues_reconciliation_on_the_ui_dispatcher()
+    public void Ui_signal_subscription_queues_the_action_on_the_ui_dispatcher()
     {
         var eventName = "Local\\VNOrchestrator.Tests." + Guid.NewGuid().ToString("N");
         var dispatcher = new RecordingUiDispatcher();
         var reconciled = false;
-        using var synchronization = new ResultReadySynchronization(eventName, dispatcher, () => reconciled = true);
+        using var subscription = new UiSignalSubscription(eventName, dispatcher, () => reconciled = true);
         using var publisher = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
 
         publisher.Set();
@@ -72,20 +70,22 @@ public sealed class OrchestratorDispatchServiceTests : IDisposable
     }
 
     [Fact]
-    public void Terminal_outcome_synchronization_queues_reconciliation_on_the_ui_dispatcher()
+    public void Ui_signal_subscription_runs_the_action_inside_the_ui_dispatcher()
     {
-        var eventName = "Local\\VNOrchestrator.Tests." + Guid.NewGuid().ToString("N");
-        var dispatcher = new RecordingUiDispatcher();
-        var reconciled = false;
-        using var synchronization = new TerminalOutcomeSynchronization(eventName, dispatcher, () => reconciled = true);
-        using var publisher = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
+        var eventName = "Local\\VNOrchestrator.InteractionSyncTests." + Guid.NewGuid().ToString("N");
+        var dispatcher = new InlineRecordingDispatcher();
+        using var processed = new ManualResetEventSlim();
+        using var subscription = new UiSignalSubscription(eventName, dispatcher, () =>
+        {
+            Assert.True(dispatcher.IsDispatching);
+            processed.Set();
+        });
+        using var signal = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
 
-        publisher.Set();
+        signal.Set();
 
-        Assert.True(SpinWait.SpinUntil(() => dispatcher.PendingAction is not null, TimeSpan.FromSeconds(1)));
-        Assert.False(reconciled);
-        dispatcher.PendingAction!();
-        Assert.True(reconciled);
+        Assert.True(processed.Wait(TimeSpan.FromSeconds(2)));
+        Assert.Equal(1, dispatcher.CallCount);
     }
 
     [Fact]
@@ -125,5 +125,19 @@ public sealed class OrchestratorDispatchServiceTests : IDisposable
     {
         public Action? PendingAction { get; private set; }
         public void BeginInvoke(Action action) => PendingAction = action;
+    }
+
+    private sealed class InlineRecordingDispatcher : IResultReadyUiDispatcher
+    {
+        public int CallCount { get; private set; }
+        public bool IsDispatching { get; private set; }
+
+        public void BeginInvoke(Action action)
+        {
+            CallCount++;
+            IsDispatching = true;
+            try { action(); }
+            finally { IsDispatching = false; }
+        }
     }
 }

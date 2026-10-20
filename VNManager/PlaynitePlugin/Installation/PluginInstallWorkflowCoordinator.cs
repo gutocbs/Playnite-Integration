@@ -22,9 +22,9 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
     private readonly IResultReadyUiDispatcher uiDispatcher;
     private readonly PendingInstallCompletionRegistry installCompletions = new();
     private readonly System.Threading.CancellationTokenSource retryCancellation = new();
-    private ResultReadySynchronization resultReadySynchronization;
-    private InteractionReadySynchronization interactionReadySynchronization;
-    private TerminalOutcomeSynchronization terminalOutcomeSynchronization;
+    private UiSignalSubscription resultReadySynchronization;
+    private UiSignalSubscription interactionReadySynchronization;
+    private UiSignalSubscription terminalOutcomeSynchronization;
     private int retryQueued;
     private bool disposed;
 
@@ -64,15 +64,15 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
     {
         if (resultReadySynchronization == null)
         {
-            resultReadySynchronization = new ResultReadySynchronization(TransportEventNames.ResultReadyNameForCurrentUser(), uiDispatcher, SynchronizeFromSignal);
+            resultReadySynchronization = new UiSignalSubscription(TransportEventNames.ResultReadyNameForCurrentUser(), uiDispatcher, SynchronizeFromSignal);
         }
         if (interactionReadySynchronization == null)
         {
-            interactionReadySynchronization = new InteractionReadySynchronization(TransportEventNames.InteractionReadyNameForCurrentUser(), uiDispatcher, ProcessInteractionsFromSignal);
+            interactionReadySynchronization = new UiSignalSubscription(TransportEventNames.InteractionReadyNameForCurrentUser(), uiDispatcher, ProcessInteractionsFromSignal);
         }
         if (terminalOutcomeSynchronization == null)
         {
-            terminalOutcomeSynchronization = new TerminalOutcomeSynchronization(TransportEventNames.InstallationTerminalOutcomeNameForCurrentUser(), uiDispatcher, ApplyTerminalOutcomes);
+            terminalOutcomeSynchronization = new UiSignalSubscription(TransportEventNames.InstallationTerminalOutcomeNameForCurrentUser(), uiDispatcher, ApplyTerminalOutcomes);
         }
         ScheduleResultSynchronization("startup");
         ScheduleInteractionProcessing("startup");

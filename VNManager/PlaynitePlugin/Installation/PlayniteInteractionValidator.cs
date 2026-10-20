@@ -12,11 +12,6 @@ internal sealed class PlayniteInteractionValidator(IPlayniteAPI api, AtomicTrans
 {
     public InteractionValidationResult Validate(PlayniteInteractionRequest request)
     {
-        if (!IsSupported(request.Kind))
-        {
-            return Reject(ProtocolErrorCode.UnsupportedInteractionKind, $"Interaction kind '{(int)request.Kind}' is not supported.");
-        }
-
         if (request.Kind == InteractionKind.ConfigureInstallation && request.Configuration == null)
         {
             return Reject(ProtocolErrorCode.MissingRequiredField, "The installation configuration prompt is missing.");
@@ -52,13 +47,6 @@ internal sealed class PlayniteInteractionValidator(IPlayniteAPI api, AtomicTrans
             return Reject(ProtocolErrorCode.SourceFingerprintMismatch, "The source archive could not be inspected.");
         }
     }
-
-    private static bool IsSupported(InteractionKind kind) => kind is
-        InteractionKind.SelectInstallerExecutable
-        or InteractionKind.SelectInstallationDirectory
-        or InteractionKind.SelectGameExecutable
-        or InteractionKind.ConfirmDirectInstallerLaunch
-        or InteractionKind.ConfigureInstallation;
 
     private static InteractionValidationResult Reject(ProtocolErrorCode errorCode, string reason) => new(false, errorCode, reason);
 }

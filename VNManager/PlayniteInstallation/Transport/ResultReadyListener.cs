@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-
 namespace VnManager.PlayniteInstallation.Transport;
 
 public sealed class ResultReadyListener : IDisposable

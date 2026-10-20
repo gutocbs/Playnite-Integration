@@ -4,33 +4,23 @@ using VNInstallation.Protocol.Transport;
 
 namespace VnManager.PlayniteInstallation.Transport;
 
-public sealed record DispatchResult(bool RequestPersisted, bool OrchestratorActivated, Exception? ActivationError);
+public sealed record DispatchResult(bool OrchestratorActivated, Exception? ActivationError);
 
 public sealed class OrchestratorDispatchService(AtomicTransportFileStore store, IOrchestratorLauncher launcher)
 {
-    public DispatchResult PersistRequest(InstallationRequest request)
-    {
-        store.WriteRequest(request);
-        return new DispatchResult(true, false, null);
-    }
+    public void PersistRequest(InstallationRequest request) => store.WriteRequest(request);
 
     public async Task<DispatchResult> ActivateAsync(CancellationToken cancellationToken = default)
     {
         try
         {
             await launcher.ActivateAsync(cancellationToken).ConfigureAwait(false);
-            return new DispatchResult(true, true, null);
+            return new DispatchResult(true, null);
         }
         catch (Exception exception) when (!(exception is OperationCanceledException && cancellationToken.IsCancellationRequested))
         {
-            return new DispatchResult(true, false, exception);
+            return new DispatchResult(false, exception);
         }
-    }
-
-    public async Task<DispatchResult> DispatchAsync(InstallationRequest request, CancellationToken cancellationToken = default)
-    {
-        PersistRequest(request);
-        return await ActivateAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public Task<DispatchResult> DispatchInstallerLaunchAsync(
@@ -81,14 +71,6 @@ public sealed class OrchestratorDispatchService(AtomicTransportFileStore store, 
     private async Task<DispatchResult> DispatchCommandAsync(Action persist, CancellationToken cancellationToken)
     {
         persist();
-        try
-        {
-            await launcher.ActivateAsync(cancellationToken).ConfigureAwait(false);
-            return new DispatchResult(true, true, null);
-        }
-        catch (Exception exception) when (!(exception is OperationCanceledException && cancellationToken.IsCancellationRequested))
-        {
-            return new DispatchResult(true, false, exception);
-        }
+        return await ActivateAsync(cancellationToken).ConfigureAwait(false);
     }
 }
