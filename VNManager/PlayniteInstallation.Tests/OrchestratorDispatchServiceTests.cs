@@ -72,6 +72,23 @@ public sealed class OrchestratorDispatchServiceTests : IDisposable
     }
 
     [Fact]
+    public void Terminal_outcome_synchronization_queues_reconciliation_on_the_ui_dispatcher()
+    {
+        var eventName = "Local\\VNOrchestrator.Tests." + Guid.NewGuid().ToString("N");
+        var dispatcher = new RecordingUiDispatcher();
+        var reconciled = false;
+        using var synchronization = new TerminalOutcomeSynchronization(eventName, dispatcher, () => reconciled = true);
+        using var publisher = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
+
+        publisher.Set();
+
+        Assert.True(SpinWait.SpinUntil(() => dispatcher.PendingAction is not null, TimeSpan.FromSeconds(1)));
+        Assert.False(reconciled);
+        dispatcher.PendingAction!();
+        Assert.True(reconciled);
+    }
+
+    [Fact]
     public void Orchestrator_wake_signal_notifies_an_open_orchestrator()
     {
         var eventName = "Local\\VNOrchestrator.Tests." + Guid.NewGuid().ToString("N");

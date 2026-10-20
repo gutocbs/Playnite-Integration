@@ -79,6 +79,31 @@ public sealed class ResultApplicationPolicyTests
         Assert.Equal(expected, decision.Conflict);
     }
 
+    [Theory]
+    [InlineData(ResultApplicationConflict.RequestMismatch)]
+    [InlineData(ResultApplicationConflict.SourceFingerprintMismatch)]
+    [InlineData(ResultApplicationConflict.DuplicateManagedAction)]
+    public void Evaluate_refuses_each_unsafe_case_for_an_installed_game(ResultApplicationConflict expected)
+    {
+        var result = Result();
+        var installed = Current() with { IsInstalled = true, InstallDirectory = result.InstallationDirectory };
+        var candidate = expected switch
+        {
+            ResultApplicationConflict.RequestMismatch => installed with { PendingRequestId = Guid.NewGuid() },
+            ResultApplicationConflict.SourceFingerprintMismatch => installed with { ExpectedSourceFingerprint = "changed" },
+            ResultApplicationConflict.DuplicateManagedAction => installed with { GameActions = installed.GameActions
+                .Append(new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, result.ExecutablePath, result.WorkingDirectory, DirectGameActionType.File))
+                .Append(new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, @"D:\\Third.exe", @"D:\\", DirectGameActionType.File))
+                .ToArray() },
+            _ => throw new ArgumentOutOfRangeException(nameof(expected))
+        };
+
+        var decision = ResultApplicationPolicy.Evaluate(candidate, result);
+
+        Assert.False(decision.IsApplicable);
+        Assert.Equal(expected, decision.Conflict);
+    }
+
     private static CurrentGameSnapshot Current() => new(
         Guid.Parse("7604d65c-cb66-4fba-83c3-b1459f754f53"),
         false,
