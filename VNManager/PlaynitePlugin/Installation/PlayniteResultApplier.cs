@@ -76,6 +76,13 @@ internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFil
                         managed.Path = result.ExecutablePath;
                         managed.WorkingDir = result.WorkingDirectory;
                         managed.IsPlayAction = managedMutation.IsPlayAction;
+                        if (mutation.LauncherFeatureToAdd is { } launcherFeature)
+                        {
+                            var feature = api.Database.Features.Add(launcherFeature);
+                            game.FeatureIds ??= new List<Guid>();
+                            if (!game.FeatureIds.Contains(feature.Id)) game.FeatureIds.Add(feature.Id);
+                            logger.Info($"VN Orchestrator result added launcher feature. RequestId='{result.RequestId}', GameId='{result.PlayniteGameId}', Feature='{launcherFeature}'.");
+                        }
                         api.Database.Games.Update(game);
                     },
                     () => store.WriteAcknowledgement(new PlayniteAcknowledgement(

@@ -14,7 +14,12 @@ public sealed record CurrentGameSnapshot(
     IReadOnlyDictionary<string, string> Metadata,
     bool HasLauncherFeature = false);
 
-public sealed record GameUpdateMutation(bool IsInstalled, string InstallDirectory, IReadOnlyList<GameActionSnapshot> GameActions, IReadOnlyDictionary<string, string> Metadata);
+public sealed record GameUpdateMutation(
+    bool IsInstalled,
+    string InstallDirectory,
+    IReadOnlyList<GameActionSnapshot> GameActions,
+    IReadOnlyDictionary<string, string> Metadata,
+    string? LauncherFeatureToAdd = null);
 
 public enum ResultApplicationConflict
 {
@@ -36,6 +41,7 @@ public sealed record ResultApplicationDecision(bool IsApplicable, GameUpdateMuta
 public static class ResultApplicationPolicy
 {
     public const string ManagedActionName = "VN Orchestrator";
+    public const string LocaleEmulatorLauncherFeature = "[Launcher] Locale Emulator";
 
     public static ResultApplicationDecision Evaluate(CurrentGameSnapshot? current, InstalledGameResult result)
     {
@@ -66,10 +72,22 @@ public static class ResultApplicationPolicy
             return ResultApplicationDecision.Reject(ResultApplicationConflict.DuplicateManagedAction);
         }
 
-        return current.IsInstalled
+        var launcherFeatureToAdd = SelectLauncherFeature(current, result);
+        if (launcherFeatureToAdd is not null) current = current with { HasLauncherFeature = true };
+
+        var decision = current.IsInstalled
             ? EvaluateInstalled(current, result, managedActions)
             : Install(current, result);
+        return decision.Mutation is null
+            ? decision
+            : ResultApplicationDecision.Apply(decision.Mutation with { LauncherFeatureToAdd = launcherFeatureToAdd });
     }
+
+    // Japanese releases usually need Locale Emulator to run; an explicit launcher choice always wins.
+    private static string? SelectLauncherFeature(CurrentGameSnapshot current, InstalledGameResult result) =>
+        !current.HasLauncherFeature && JapaneseText.Contains(Path.GetFileNameWithoutExtension(result.SourcePath))
+            ? LocaleEmulatorLauncherFeature
+            : null;
 
     private static ResultApplicationDecision EvaluateInstalled(
         CurrentGameSnapshot current,

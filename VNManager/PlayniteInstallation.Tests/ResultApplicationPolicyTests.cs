@@ -162,6 +162,50 @@ public sealed class ResultApplicationPolicyTests
         Assert.False(Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName).IsPlayAction);
     }
 
+    [Theory]
+    [InlineData(@"K:\Temp\プライミニスター.rar")]
+    [InlineData(@"K:\Temp\ろけらぶ -Location Love- 電車×同級生.rar")]
+    [InlineData(@"K:\Temp\恋愛.rar")]
+    [InlineData(@"K:\Temp\ｶﾀｶﾅ.rar")]
+    [InlineData(@"K:\Temp\アイキス.rar")]
+    public void Evaluate_adds_the_locale_emulator_feature_and_leaves_play_to_the_launcher_for_a_japanese_archive_name(string sourcePath)
+    {
+        var decision = ResultApplicationPolicy.Evaluate(CurrentFrom(sourcePath), ResultFrom(sourcePath));
+
+        var mutation = Assert.IsType<GameUpdateMutation>(decision.Mutation);
+        Assert.Equal("[Launcher] Locale Emulator", mutation.LauncherFeatureToAdd);
+        Assert.False(Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName).IsPlayAction);
+    }
+
+    [Theory]
+    [InlineData(@"K:\Temp\LOVELY×CATION.rar")]
+    [InlineData(@"K:\日本語\Game.rar")]
+    public void Evaluate_does_not_add_a_launcher_feature_when_the_archive_name_is_not_japanese(string sourcePath)
+    {
+        var decision = ResultApplicationPolicy.Evaluate(CurrentFrom(sourcePath), ResultFrom(sourcePath));
+
+        var mutation = Assert.IsType<GameUpdateMutation>(decision.Mutation);
+        Assert.Null(mutation.LauncherFeatureToAdd);
+        Assert.True(Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName).IsPlayAction);
+    }
+
+    [Fact]
+    public void Evaluate_keeps_an_existing_launcher_feature_for_a_japanese_archive_name()
+    {
+        const string sourcePath = @"K:\Temp\プライミニスター.rar";
+        var current = CurrentFrom(sourcePath) with { HasLauncherFeature = true };
+
+        var decision = ResultApplicationPolicy.Evaluate(current, ResultFrom(sourcePath));
+
+        var mutation = Assert.IsType<GameUpdateMutation>(decision.Mutation);
+        Assert.Null(mutation.LauncherFeatureToAdd);
+        Assert.False(Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName).IsPlayAction);
+    }
+
+    private static CurrentGameSnapshot CurrentFrom(string sourcePath) => CurrentWith() with { InstallDirectory = sourcePath };
+
+    private static InstalledGameResult ResultFrom(string sourcePath) => Result() with { SourcePath = sourcePath };
+
     private static CurrentGameSnapshot CurrentWith(params GameActionSnapshot[] actions) =>
         Current() with { GameActions = actions, Metadata = new Dictionary<string, string>() };
 

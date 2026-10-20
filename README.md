@@ -94,6 +94,8 @@ or:
 
 The name after `[Launcher]` is a logical launcher identifier, not a file path. Available identifiers are registered in `HostComposition` and are matched case-insensitively.
 
+Games installed through the VN Install Orchestrator get `[Launcher] Locale Emulator` automatically when the source archive file name contains Japanese characters (Hiragana, Katakana or Kanji) and the game has no `[Launcher]` feature yet. An existing `[Launcher]` feature is never replaced.
+
 ### Build the Playnite plugin
 
 The plugin package includes the published supervisor output. Publish the supervisor first, then build the plugin in Release mode:
