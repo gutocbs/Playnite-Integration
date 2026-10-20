@@ -9,6 +9,7 @@ using VNInstallation.Protocol.Serialization;
 using VNInstallation.Protocol.Transport;
 using VnManager.PlayniteInstallation.Domain;
 using VnManager.PlayniteInstallation.Transport;
+using VnManager.PlaynitePlugin.Launching;
 
 namespace VnManager.PlaynitePlugin.Installation;
 
@@ -105,5 +106,5 @@ internal sealed class PlayniteResultApplier(IPlayniteAPI api, AtomicTransportFil
         game.Id, game.IsInstalled, game.InstallDirectory, result.RequestId, result.SourceFingerprint,
         game.GameActions?.Select(action => new GameActionSnapshot(action.Name, action.Path, action.WorkingDir, action.IsPlayAction)).ToArray() ?? Array.Empty<GameActionSnapshot>(),
         new Dictionary<string, string>(),
-        game.Features?.Any(feature => feature?.Name?.StartsWith("[Launcher]", StringComparison.OrdinalIgnoreCase) == true) == true);
+        game.Features?.Any(feature => feature?.Name?.StartsWith(SupervisorPlayAction.LauncherFeaturePrefix, StringComparison.OrdinalIgnoreCase) == true) == true);
 }

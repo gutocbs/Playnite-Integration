@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
@@ -21,7 +23,7 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
     private readonly ILogger logger = LogManager.GetLogger(nameof(PluginInstallWorkflowCoordinator));
     private readonly IResultReadyUiDispatcher uiDispatcher;
     private readonly PendingInstallCompletionRegistry installCompletions = new();
-    private readonly System.Threading.CancellationTokenSource retryCancellation = new();
+    private readonly CancellationTokenSource retryCancellation = new();
     private UiSignalSubscription resultReadySynchronization;
     private UiSignalSubscription interactionReadySynchronization;
     private UiSignalSubscription terminalOutcomeSynchronization;
@@ -33,13 +35,14 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
         this.api = api;
         store = new AtomicTransportFileStore(new TransportPaths(transportRoot));
         dispatch = new OrchestratorDispatchService(store, new OrchestratorProcessActivator(orchestratorPath));
-        resultApplier = new PlayniteResultApplier(api, store, logger, new NamedOrchestratorWakeSignal(OrchestratorWakeEvent.NameForCurrentUser()), () => ScheduleResultSynchronization("lock-contention", TimeSpan.FromMilliseconds(250)), installCompletions.TryComplete);
+        var wakeSignal = new NamedOrchestratorWakeSignal(OrchestratorWakeEvent.NameForCurrentUser());
+        resultApplier = new PlayniteResultApplier(api, store, logger, wakeSignal, () => ScheduleResultSynchronization("lock-contention", TimeSpan.FromMilliseconds(250)), installCompletions.TryComplete);
         uiDispatcher = new PlayniteUiDispatcher(api);
         interactionProcessor = new InteractionRequestProcessor(
             store,
             new PlayniteInteractionDialog(api),
             new PlayniteInteractionValidator(api, store),
-            new NamedOrchestratorWakeSignal(OrchestratorWakeEvent.NameForCurrentUser()));
+            wakeSignal);
     }
 
     public bool IsEligible(Game game) => InstallEligibility.Evaluate(PlayniteInstallAdapter.ToSnapshot(game), new FileProbe(), new NoActiveWorkflowLookup()).IsEligible;
@@ -64,11 +67,11 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
     {
         if (resultReadySynchronization == null)
         {
-            resultReadySynchronization = new UiSignalSubscription(TransportEventNames.ResultReadyNameForCurrentUser(), uiDispatcher, SynchronizeFromSignal);
+            resultReadySynchronization = new UiSignalSubscription(TransportEventNames.ResultReadyNameForCurrentUser(), uiDispatcher, () => SynchronizeResults("signal"));
         }
         if (interactionReadySynchronization == null)
         {
-            interactionReadySynchronization = new UiSignalSubscription(TransportEventNames.InteractionReadyNameForCurrentUser(), uiDispatcher, ProcessInteractionsFromSignal);
+            interactionReadySynchronization = new UiSignalSubscription(TransportEventNames.InteractionReadyNameForCurrentUser(), uiDispatcher, () => ProcessInteractions("signal"));
         }
         if (terminalOutcomeSynchronization == null)
         {
@@ -81,7 +84,7 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
 
     public void ReconcilePendingResults() => resultApplier.ApplyPending();
 
-    private void MonitorPreparation(VNInstallation.Protocol.Contracts.InstallationRequest request)
+    private void MonitorPreparation(InstallationRequest request)
     {
         PreparationOutcome outcome = null;
         var cancelled = false;
@@ -96,7 +99,7 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
             {
                 outcome = store.ConsumePreparationOutcome(request.RequestId, request.PlayniteGameId);
                 if (outcome != null) return;
-                System.Threading.Thread.Sleep(100);
+                Thread.Sleep(100);
             }
             cancelled = true;
         }, new GlobalProgressOptions("Extraindo arquivos do jogo...", true) { IsIndeterminate = true });
@@ -140,7 +143,7 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
         });
     }
 
-    private void CancelLiveInstall(VNInstallation.Protocol.Contracts.InstallationRequest request, bool publishCancellation)
+    private void CancelLiveInstall(InstallationRequest request, bool publishCancellation)
     {
         installCompletions.TryCancel(request.RequestId, request.PlayniteGameId);
         if (publishCancellation) _ = dispatch.DispatchCancellationAsync(request.RequestId, request.PlayniteGameId);
@@ -158,51 +161,38 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
         }
     }
 
-    private void SynchronizeFromSignal()
+    private void SynchronizeResults(string trigger)
     {
         try
         {
-            logger.Info("VN Orchestrator result synchronization started from signal.");
+            logger.Info($"VN Orchestrator result synchronization started from {trigger}.");
             ReconcilePendingResults();
         }
         catch (Exception exception)
         {
-            logger.Error($"VN Orchestrator result synchronization failed after signal. Exception='{exception}'.");
+            logger.Error($"VN Orchestrator result synchronization failed after {trigger}. Exception='{exception}'.");
         }
     }
 
-    private void ProcessInteractionsFromSignal()
+    private void ProcessInteractions(string trigger)
     {
         try
         {
-            logger.Info("VN Orchestrator interaction processing started from signal.");
+            logger.Info($"VN Orchestrator interaction processing started from {trigger}.");
             var summary = interactionProcessor.ProcessPending();
             LogRejectedInteractions(summary);
-            logger.Info($"VN Orchestrator interaction processing completed from signal. Processed='{summary.Processed}'.");
+            logger.Info($"VN Orchestrator interaction processing completed from {trigger}. Processed='{summary.Processed}'.");
         }
         catch (Exception exception)
         {
-            logger.Error($"VN Orchestrator interaction processing failed after signal. Exception='{exception}'.");
+            logger.Error($"VN Orchestrator interaction processing failed after {trigger}. Exception='{exception}'.");
         }
     }
 
     private void ScheduleInteractionProcessing(string trigger)
     {
         if (disposed) return;
-        try { uiDispatcher.BeginInvoke(new Action(() =>
-        {
-            try
-            {
-                logger.Info($"VN Orchestrator interaction processing started from {trigger}.");
-                var summary = interactionProcessor.ProcessPending();
-                LogRejectedInteractions(summary);
-                logger.Info($"VN Orchestrator interaction processing completed from {trigger}. Processed='{summary.Processed}'.");
-            }
-            catch (Exception exception)
-            {
-                logger.Error($"VN Orchestrator interaction processing failed after {trigger}. Exception='{exception}'.");
-            }
-        })); }
+        try { uiDispatcher.BeginInvoke(new Action(() => ProcessInteractions(trigger))); }
         catch (Exception exception) when (disposed)
         {
             logger.Warn($"VN Orchestrator interaction processing was skipped during shutdown. Exception='{exception}'.");
@@ -214,27 +204,16 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
         if (disposed) return;
         if (delay is { } retryDelay)
         {
-            if (System.Threading.Interlocked.Exchange(ref retryQueued, 1) != 0) return;
-            System.Threading.Tasks.Task.Delay(retryDelay, retryCancellation.Token).ContinueWith(completed =>
+            if (Interlocked.Exchange(ref retryQueued, 1) != 0) return;
+            Task.Delay(retryDelay, retryCancellation.Token).ContinueWith(completed =>
             {
                 if (completed.IsCanceled || disposed) return;
                 ScheduleResultSynchronization(trigger);
-            }, System.Threading.CancellationToken.None, System.Threading.Tasks.TaskContinuationOptions.OnlyOnRanToCompletion, System.Threading.Tasks.TaskScheduler.Default);
+            }, CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
             return;
         }
-        System.Threading.Interlocked.Exchange(ref retryQueued, 0);
-        try { uiDispatcher.BeginInvoke(new Action(() =>
-        {
-            try
-            {
-                logger.Info($"VN Orchestrator result synchronization started from {trigger}.");
-                ReconcilePendingResults();
-            }
-            catch (Exception exception)
-            {
-                logger.Error($"VN Orchestrator result synchronization failed after {trigger}. Exception='{exception}'.");
-            }
-        })); }
+        Interlocked.Exchange(ref retryQueued, 0);
+        try { uiDispatcher.BeginInvoke(new Action(() => SynchronizeResults(trigger))); }
         catch (Exception exception) when (disposed)
         {
             logger.Warn($"VN Orchestrator result synchronization was skipped during shutdown. Exception='{exception}'.");
@@ -253,21 +232,12 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
     {
         disposed = true;
         retryCancellation.Cancel();
-        if (resultReadySynchronization != null)
-        {
-            resultReadySynchronization.Dispose();
-            resultReadySynchronization = null;
-        }
-        if (interactionReadySynchronization != null)
-        {
-            interactionReadySynchronization.Dispose();
-            interactionReadySynchronization = null;
-        }
-        if (terminalOutcomeSynchronization != null)
-        {
-            terminalOutcomeSynchronization.Dispose();
-            terminalOutcomeSynchronization = null;
-        }
+        resultReadySynchronization?.Dispose();
+        resultReadySynchronization = null;
+        interactionReadySynchronization?.Dispose();
+        interactionReadySynchronization = null;
+        terminalOutcomeSynchronization?.Dispose();
+        terminalOutcomeSynchronization = null;
         retryCancellation.Dispose();
     }
 

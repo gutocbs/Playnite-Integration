@@ -46,7 +46,7 @@ internal sealed class InstallationConfigurationDialog(IPlayniteAPI api)
         view.BrowseExecutableRequested += (_, _) =>
         {
             var initialDirectory = GetExecutableInitialDirectory(view.ExecutablePath, view.GameDirectory);
-            var selected = api.Dialogs.SelectFile(request.FileFilter ?? "Executable files|*.exe", initialDirectory);
+            var selected = api.Dialogs.SelectFile(request.FileFilter ?? InstallationDialogs.ExecutableFileFilter, initialDirectory);
             if (!string.IsNullOrWhiteSpace(selected)) view.ExecutablePath = selected;
         };
         view.BrowseExtraFilesDirectoryRequested += (_, _) =>

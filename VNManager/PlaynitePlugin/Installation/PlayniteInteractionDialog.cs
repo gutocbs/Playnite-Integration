@@ -20,7 +20,7 @@ internal sealed class PlayniteInteractionDialog(IPlayniteAPI api) : IInteraction
                 return SelectedOrCancelled(api.Dialogs.SelectFolder(request.InitialDirectory));
             case InteractionKind.SelectInstallerExecutable:
             case InteractionKind.SelectGameExecutable:
-                return SelectedOrCancelled(api.Dialogs.SelectFile(request.FileFilter ?? "Executable files|*.exe", request.InitialDirectory));
+                return SelectedOrCancelled(api.Dialogs.SelectFile(request.FileFilter ?? InstallationDialogs.ExecutableFileFilter, request.InitialDirectory));
             case InteractionKind.ConfirmDirectInstallerLaunch:
                 var answer = api.Dialogs.ShowMessage(request.Purpose, request.Caption, MessageBoxButton.YesNo);
                 return new InteractionDialogResult(
