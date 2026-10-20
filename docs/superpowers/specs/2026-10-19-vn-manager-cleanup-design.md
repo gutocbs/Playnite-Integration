@@ -72,6 +72,31 @@ Superseded e nova ADR-005; README atualizado. Instruções de IA consolidadas em
 na raiz (conteúdo de `docs/AGENT.md` + `codex.md`, corrigido); `codex.md` e um novo
 `CLAUDE.md` apenas mandam ler o `AGENTS.md`.
 
+### Instalação de VNs — Parte 5 (aprovada em 2026-10-20)
+O desenvolvimento do agente terminou; o Installer não referencia o Manager (só o
+pacote `VNInstallation.Protocol` alpha.7), então nada aqui muda protocolo, eventos ou
+arquivos trocados.
+- Código morto: `OrchestratorDispatchService.DispatchAsync`, `DispatchResult.RequestPersisted`,
+  `PendingInstallCompletionRegistry.Remove`, `InstallationConfigurationForm.ExtraFilesDirectory`,
+  o enum `DirectGameActionType` (com o campo `Type` e a checagem), e o `IsSupported` do
+  `PlayniteInteractionValidator` (o processor já filtra).
+- Duplicação: as 3 classes `*Synchronization` viram `UiSignalSubscription`;
+  `DispatchCommandAsync` reaproveita `ActivateAsync`; `ResultApplicationPolicy` faz as
+  checagens comuns uma vez (ordem preservada) com `IsManaged`; no
+  `PluginInstallWorkflowCoordinator`, métodos de sinal e agendados unificados (mesmos logs),
+  `Dispose` com `?.`, um só wake signal, `using` no lugar de nomes qualificados; `"[Launcher]"`
+  via `SupervisorPlayAction.LauncherFeaturePrefix`; constante para o filtro `*.exe`;
+  `using` redundantes.
+- Build: `Directory.Build.props` igual ao do Installer (feed em `..\` ou `..\..\..\`);
+  `NuGet.Config` mantido só com nuget.org (exigido pelo `verify-consumers.ps1`).
+- README: seção de verificação do protocolo com alpha.7 e caminhos do checkout normal.
+- Testes: apagar `AtomicTransportFileStoreTests`, `ProtocolV1Tests`, `SharedProtocolDependencyTests`
+  (cobertos no repositório do Protocol); juntar `ManagedPlayActionPolicyTests` em
+  `ResultApplicationPolicyTests`; caracterização dos conflitos com jogo instalado e do sinal
+  terminal.
+- Não muda (comportamento, só registrado): `Snapshot` do applier usa request/fingerprint do
+  próprio resultado; `NoActiveWorkflowLookup` sempre falso.
+
 ### Commits
 Commitar tudo na `review-e-correção`, incluindo as alterações do usuário em `.gitignore` e
 `codex.md`. Nunca subir para `release`. O usuário valida manualmente no Playnite ao fim.
