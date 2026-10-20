@@ -118,7 +118,7 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
         if (outcome is null || outcome.Outcome == PreparationOutcomeKind.Failed)
         {
             CancelLiveInstall(request, publishCancellation: false);
-            api.Notifications.Add("VNOrchestrator", "Não foi possível preparar os arquivos do jogo. Consulte o log do Orchestrator.", NotificationType.Error);
+            ShowFailure("Não foi possível preparar os arquivos do jogo.", outcome?.FailureReason);
             return;
         }
         if (outcome.Outcome == PreparationOutcomeKind.PreparedWithoutInstallerLaunch)
@@ -156,9 +156,17 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
             if (store.ConsumeInstallationTerminalOutcome(outcome.RequestId, outcome.WorkflowId, outcome.PlayniteGameId) is null) continue;
             if (installCompletions.TryCancel(outcome.RequestId, outcome.PlayniteGameId))
             {
-                api.Notifications.Add("VNOrchestrator", "O instalador externo não foi concluído. Consulte o log do Orchestrator.", NotificationType.Error);
+                ShowFailure("A instalação não foi concluída.", outcome.FailureReason);
             }
         }
+    }
+
+    // A notification is easy to miss; the Orchestrator's reason usually tells the user what to fix.
+    private void ShowFailure(string summary, string reason)
+    {
+        var message = InstallationFailureMessage.Format(summary, reason);
+        logger.Warn($"VN Orchestrator installation failed. Message='{message}'.");
+        api.Dialogs.ShowErrorMessage(message, "VN Orchestrator");
     }
 
     private void SynchronizeResults(string trigger)
