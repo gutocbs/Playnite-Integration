@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
@@ -18,12 +19,15 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
     private readonly IPlayniteAPI api;
     private readonly AtomicTransportFileStore store;
     private readonly OrchestratorDispatchService dispatch;
+    private readonly PreparationOutcomeWaiter preparationWaiter;
     private readonly PlayniteResultApplier resultApplier;
     private readonly InteractionRequestProcessor interactionProcessor;
     private readonly ILogger logger = LogManager.GetLogger(nameof(PluginInstallWorkflowCoordinator));
     private readonly IResultReadyUiDispatcher uiDispatcher;
     private readonly PendingInstallCompletionRegistry installCompletions = new();
     private readonly CancellationTokenSource retryCancellation = new();
+    // Accessed only on the Playnite UI thread.
+    private readonly Dictionary<Guid, CancellationTokenSource> pendingPreparations = new();
     private UiSignalSubscription resultReadySynchronization;
     private UiSignalSubscription interactionReadySynchronization;
     private UiSignalSubscription terminalOutcomeSynchronization;
@@ -35,6 +39,7 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
         this.api = api;
         store = new AtomicTransportFileStore(new TransportPaths(transportRoot));
         dispatch = new OrchestratorDispatchService(store, new OrchestratorProcessActivator(orchestratorPath));
+        preparationWaiter = new PreparationOutcomeWaiter(dispatch, store, TimeSpan.FromMilliseconds(250));
         var wakeSignal = new NamedOrchestratorWakeSignal(OrchestratorWakeEvent.NameForCurrentUser());
         resultApplier = new PlayniteResultApplier(api, store, logger, wakeSignal, () => ScheduleResultSynchronization("lock-contention", TimeSpan.FromMilliseconds(250)), installCompletions.TryComplete);
         uiDispatcher = new PlayniteUiDispatcher(api);
@@ -84,37 +89,59 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
 
     public void ReconcilePendingResults() => resultApplier.ApplyPending();
 
+    public bool HasPendingPreparation(Guid gameId) => pendingPreparations.ContainsKey(gameId);
+
+    public void CancelPendingPreparation(Guid gameId)
+    {
+        if (pendingPreparations.TryGetValue(gameId, out var cancellation)) cancellation.Cancel();
+    }
+
+    // Extraction can take minutes; a modal progress window would block Playnite for all of it.
     private void MonitorPreparation(InstallationRequest request)
     {
-        PreparationOutcome outcome = null;
-        var cancelled = false;
-        DispatchResult activation = null;
-        var progress = api.Dialogs.ActivateGlobalProgress(args =>
-        {
-            args.Text = "Extraindo arquivos do jogo...";
-            args.IsIndeterminate = true;
-            activation = dispatch.ActivateAsync().GetAwaiter().GetResult();
-            if (!activation.OrchestratorActivated) return;
-            while (!args.CancelToken.IsCancellationRequested)
-            {
-                outcome = store.ConsumePreparationOutcome(request.RequestId, request.PlayniteGameId);
-                if (outcome != null) return;
-                Thread.Sleep(100);
-            }
-            cancelled = true;
-        }, new GlobalProgressOptions("Extraindo arquivos do jogo...", true) { IsIndeterminate = true });
+        var cancellation = new CancellationTokenSource();
+        pendingPreparations[request.PlayniteGameId] = cancellation;
+        preparationWaiter.WaitAsync(request, cancellation.Token).ContinueWith(
+            waited => uiDispatcher.BeginInvoke(() => CompletePreparation(request, cancellation, waited)),
+            TaskScheduler.Default);
+        api.Dialogs.ShowMessage(
+            "O jogo será extraído em segundo plano e você pode continuar usando o Playnite.\n\n"
+            + "Assim que a extração terminar, o instalador começará. Para cancelar, use \"" + CancelPreparationMenuDescription + "\" no menu do jogo.",
+            "VN Orchestrator",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
 
-        if (activation is null || !activation.OrchestratorActivated)
+    public const string CancelPreparationMenuDescription = "Cancelar instalação (VN Orchestrator)";
+
+    private void CompletePreparation(InstallationRequest request, CancellationTokenSource cancellation, Task<PreparationWaitResult> waited)
+    {
+        if (pendingPreparations.TryGetValue(request.PlayniteGameId, out var current) && current == cancellation)
+        {
+            pendingPreparations.Remove(request.PlayniteGameId);
+        }
+        cancellation.Dispose();
+        if (waited.IsFaulted)
+        {
+            logger.Error($"VN Orchestrator preparation monitoring failed. RequestId='{request.RequestId}', Exception='{waited.Exception}'.");
+            CancelLiveInstall(request, publishCancellation: true);
+            ShowFailure("Não foi possível acompanhar a extração do jogo.", null);
+            return;
+        }
+
+        var result = waited.Result;
+        if (!result.Activation.OrchestratorActivated)
         {
             CancelLiveInstall(request, publishCancellation: true);
             api.Notifications.Add("VNOrchestrator", "A solicitação foi salva, mas o VN Install Orchestrator não pôde ser iniciado.", NotificationType.Error);
             return;
         }
-        if (cancelled || progress.Canceled)
+        if (result.IsCancelled)
         {
             CancelLiveInstall(request, publishCancellation: true);
             return;
         }
+        var outcome = result.Outcome;
         if (outcome is null || outcome.Outcome == PreparationOutcomeKind.Failed)
         {
             CancelLiveInstall(request, publishCancellation: false);
@@ -239,6 +266,7 @@ internal sealed class PluginInstallWorkflowCoordinator : IDisposable
     public void Dispose()
     {
         disposed = true;
+        foreach (var cancellation in pendingPreparations.Values) cancellation.Cancel();
         retryCancellation.Cancel();
         resultReadySynchronization?.Dispose();
         resultReadySynchronization = null;

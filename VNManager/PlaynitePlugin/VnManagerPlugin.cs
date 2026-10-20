@@ -62,6 +62,17 @@ public sealed class VnManagerPlugin : GenericPlugin
         }
     }
 
+    public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args)
+    {
+        if (args.Games?.Count != 1 || !_installCoordinator.HasPendingPreparation(args.Games[0].Id)) yield break;
+        var gameId = args.Games[0].Id;
+        yield return new GameMenuItem
+        {
+            Description = PluginInstallWorkflowCoordinator.CancelPreparationMenuDescription,
+            Action = _ => _installCoordinator.CancelPendingPreparation(gameId)
+        };
+    }
+
     public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
     {
         _installCoordinator.StartResultSynchronization();
