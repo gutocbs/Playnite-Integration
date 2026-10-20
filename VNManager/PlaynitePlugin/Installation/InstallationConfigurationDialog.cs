@@ -22,7 +22,7 @@ internal sealed class InstallationConfigurationDialog(IPlayniteAPI api)
             Purpose = request.Purpose,
             GameDirectory = form.GameDirectory ?? string.Empty,
             ExecutablePath = form.ExecutablePath ?? string.Empty,
-            ExtraFilesDirectory = form.ExtraFilesDirectory ?? string.Empty
+            ExtraFilesDirectory = string.Empty
         };
         var owner = api.Dialogs.GetCurrentAppWindow();
         var window = api.Dialogs.CreateWindow(new WindowCreationOptions

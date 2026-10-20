@@ -6,8 +6,6 @@ public sealed class PendingInstallCompletionRegistry
 
     public void Register(Guid requestId, Guid gameId, Action<string> complete, Action? cancel = null) => pending[requestId] = new PendingCompletion(gameId, complete, cancel);
 
-    public void Remove(Guid requestId) => pending.Remove(requestId);
-
     public bool TryComplete(Guid requestId, Guid gameId, string installationDirectory)
     {
         if (!pending.TryGetValue(requestId, out var pendingCompletion) || pendingCompletion.GameId != gameId) return false;

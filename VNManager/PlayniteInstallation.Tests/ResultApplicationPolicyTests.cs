@@ -34,8 +34,7 @@ public sealed class ResultApplicationPolicyTests
                 .Append(new GameActionSnapshot(
                     ResultApplicationPolicy.ManagedActionName,
                     result.ExecutablePath,
-                    result.WorkingDirectory,
-                    DirectGameActionType.File))
+                    result.WorkingDirectory))
                 .ToArray()
         };
 
@@ -67,8 +66,8 @@ public sealed class ResultApplicationPolicyTests
             ResultApplicationConflict.RequestMismatch => current with { PendingRequestId = Guid.NewGuid() },
             ResultApplicationConflict.SourceFingerprintMismatch => current with { ExpectedSourceFingerprint = "changed" },
             ResultApplicationConflict.DuplicateManagedAction => current with { GameActions = current.GameActions
-                .Append(new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, @"D:\\Another.exe", @"D:\\", DirectGameActionType.File))
-                .Append(new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, @"D:\\Third.exe", @"D:\\", DirectGameActionType.File))
+                .Append(new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, @"D:\\Another.exe", @"D:\\"))
+                .Append(new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, @"D:\\Third.exe", @"D:\\"))
                 .ToArray() },
             _ => throw new ArgumentOutOfRangeException(nameof(expected))
         };
@@ -92,8 +91,8 @@ public sealed class ResultApplicationPolicyTests
             ResultApplicationConflict.RequestMismatch => installed with { PendingRequestId = Guid.NewGuid() },
             ResultApplicationConflict.SourceFingerprintMismatch => installed with { ExpectedSourceFingerprint = "changed" },
             ResultApplicationConflict.DuplicateManagedAction => installed with { GameActions = installed.GameActions
-                .Append(new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, result.ExecutablePath, result.WorkingDirectory, DirectGameActionType.File))
-                .Append(new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, @"D:\\Third.exe", @"D:\\", DirectGameActionType.File))
+                .Append(new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, result.ExecutablePath, result.WorkingDirectory))
+                .Append(new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, @"D:\\Third.exe", @"D:\\"))
                 .ToArray() },
             _ => throw new ArgumentOutOfRangeException(nameof(expected))
         };
@@ -104,13 +103,75 @@ public sealed class ResultApplicationPolicyTests
         Assert.Equal(expected, decision.Conflict);
     }
 
+    [Fact]
+    public void Evaluate_marks_a_new_managed_action_as_the_play_action_without_changing_unrelated_actions()
+    {
+        var unrelated = new GameActionSnapshot("Unrelated action", @"C:\\Tool.exe", @"C:\\", true);
+        var decision = ResultApplicationPolicy.Evaluate(CurrentWith(unrelated), Result());
+
+        var mutation = Assert.IsType<GameUpdateMutation>(decision.Mutation);
+        Assert.True(Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName).IsPlayAction);
+        Assert.Equal(unrelated, Assert.Single(mutation.GameActions, action => action.Name == unrelated.Name));
+    }
+
+    [Fact]
+    public void Evaluate_does_not_mark_a_new_managed_action_as_play_when_a_launcher_feature_exists()
+    {
+        var current = CurrentWith() with { HasLauncherFeature = true };
+
+        var decision = ResultApplicationPolicy.Evaluate(current, Result());
+
+        var mutation = Assert.IsType<GameUpdateMutation>(decision.Mutation);
+        Assert.False(Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName).IsPlayAction);
+    }
+
+    [Fact]
+    public void Evaluate_corrects_an_existing_managed_action_in_place_during_an_idempotent_retry()
+    {
+        var result = Result();
+        var managed = new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, result.ExecutablePath, result.WorkingDirectory, false);
+        var unrelated = new GameActionSnapshot("Unrelated action", @"C:\\Tool.exe", @"C:\\", true);
+        var current = CurrentWith(unrelated, managed) with
+        {
+            IsInstalled = true,
+            InstallDirectory = result.InstallationDirectory
+        };
+
+        var decision = ResultApplicationPolicy.Evaluate(current, result);
+
+        var mutation = Assert.IsType<GameUpdateMutation>(decision.Mutation);
+        Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName && action.IsPlayAction);
+        Assert.Equal(unrelated, Assert.Single(mutation.GameActions, action => action.Name == unrelated.Name));
+    }
+
+    [Fact]
+    public void Evaluate_clears_the_managed_play_action_on_retry_when_a_launcher_feature_exists()
+    {
+        var result = Result();
+        var managed = new GameActionSnapshot(ResultApplicationPolicy.ManagedActionName, result.ExecutablePath, result.WorkingDirectory, true);
+        var current = CurrentWith(managed) with
+        {
+            IsInstalled = true,
+            InstallDirectory = result.InstallationDirectory,
+            HasLauncherFeature = true
+        };
+
+        var decision = ResultApplicationPolicy.Evaluate(current, result);
+
+        var mutation = Assert.IsType<GameUpdateMutation>(decision.Mutation);
+        Assert.False(Assert.Single(mutation.GameActions, action => action.Name == ResultApplicationPolicy.ManagedActionName).IsPlayAction);
+    }
+
+    private static CurrentGameSnapshot CurrentWith(params GameActionSnapshot[] actions) =>
+        Current() with { GameActions = actions, Metadata = new Dictionary<string, string>() };
+
     private static CurrentGameSnapshot Current() => new(
         Guid.Parse("7604d65c-cb66-4fba-83c3-b1459f754f53"),
         false,
         @"K:\\Game.rar",
         Guid.Parse("5b1af416-9e33-4c67-8e15-014d9f630b57"),
         "fingerprint",
-        new[] { new GameActionSnapshot("Unrelated action", @"C:\\Tool.exe", @"C:\\", DirectGameActionType.File) },
+        new[] { new GameActionSnapshot("Unrelated action", @"C:\\Tool.exe", @"C:\\") },
         new Dictionary<string, string> { ["Unrelated metadata"] = "value" });
 
     private static InstalledGameResult Result() => new(

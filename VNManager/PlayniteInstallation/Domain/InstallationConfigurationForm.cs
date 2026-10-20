@@ -13,7 +13,6 @@ public sealed class InstallationConfigurationForm
 
     public string? GameDirectory { get; }
     public string? ExecutablePath { get; }
-    public string? ExtraFilesDirectory => null;
 
     public static InstallationConfigurationForm Create(InstallationConfigurationPrompt prompt)
     {

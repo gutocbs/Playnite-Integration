@@ -16,7 +16,6 @@ public sealed class InstallationConfigurationFormTests
 
         Assert.Equal(@"D:\Jogos\星の記憶", form.GameDirectory);
         Assert.Equal(@"D:\Jogos\星の記憶\星.exe", form.ExecutablePath);
-        Assert.Null(form.ExtraFilesDirectory);
     }
 
     [Theory]
